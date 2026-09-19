@@ -16,6 +16,10 @@ cp .env.example .env
 
 Set a strong `POSTGRES_PASSWORD` in `.env`, then run:
 
+Review `config.yml` before deployment to choose the stock batch, fund symbol,
+partition start/timezone, schedule time, and whether the schedule should start
+enabled by default. This file is versioned and contains no secrets.
+
 ```bash
 sh ./scripts/deploy.sh
 sh ./scripts/smoke-test.sh

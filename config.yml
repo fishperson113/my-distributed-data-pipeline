@@ -1,0 +1,20 @@
+ingestion:
+  stock:
+    provider: kbs
+    symbols:
+      - FPT
+      - VNM
+      - HPG
+  fund:
+    symbol: E1VFVN30
+
+partitions:
+  daily_market:
+    start_date: "2020-01-01"
+    timezone: Asia/Ho_Chi_Minh
+
+schedules:
+  daily_market_ingestion:
+    hour: 6
+    minute: 0
+    enabled_by_default: false

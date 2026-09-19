@@ -11,7 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/dagster/app
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md config.yml ./
 COPY src ./src
 
 RUN uv sync --frozen --no-dev \

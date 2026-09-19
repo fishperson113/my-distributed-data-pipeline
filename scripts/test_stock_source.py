@@ -6,7 +6,7 @@ import argparse
 from datetime import date, timedelta
 from pathlib import Path
 
-from data_pipeline.config import SourceSettings
+from data_pipeline.config import InfrastructureSettings, PipelineConfig, load_pipeline_config
 from data_pipeline.ingestion.common.raw_output import write_raw_extraction
 from data_pipeline.ingestion.stock import extract_stock_daily
 
@@ -16,7 +16,9 @@ def _default_dates() -> tuple[str, str]:
     return (end - timedelta(days=30)).isoformat(), end.isoformat()
 
 
-def build_parser(settings: SourceSettings) -> argparse.ArgumentParser:
+def build_parser(
+    infrastructure: InfrastructureSettings, policy: PipelineConfig
+) -> argparse.ArgumentParser:
     """Build the stock source-test CLI parser."""
 
     default_start, default_end = _default_dates()
@@ -25,7 +27,7 @@ def build_parser(settings: SourceSettings) -> argparse.ArgumentParser:
     parser.add_argument("--start", default=default_start)
     parser.add_argument("--end", default=default_end)
     parser.add_argument(
-        "--provider", default=settings.vnstock_provider, choices=("kbs", "vci")
+        "--provider", default=policy.stock.provider, choices=("kbs", "vci")
     )
     parser.add_argument("--output", type=Path)
     return parser
@@ -34,16 +36,17 @@ def build_parser(settings: SourceSettings) -> argparse.ArgumentParser:
 def main() -> int:
     """Run a vnstock extraction and persist its raw JSON envelope."""
 
-    settings = SourceSettings.from_env()
-    args = build_parser(settings).parse_args()
-    symbols = args.symbols or ["FPT"]
+    infrastructure = InfrastructureSettings.from_env()
+    policy = load_pipeline_config()
+    args = build_parser(infrastructure, policy).parse_args()
+    symbols = args.symbols or list(policy.stock.symbols)
     extraction = extract_stock_daily(
         symbols=symbols,
         start=args.start,
         end=args.end,
         provider=args.provider,
     )
-    output = args.output or settings.raw_storage_path / Path(
+    output = args.output or infrastructure.raw_storage_path / Path(
         f"vnstock/stock_daily_{args.start}_{args.end}.json"
     )
     write_raw_extraction(extraction, output)

@@ -691,6 +691,9 @@ Phase 1 hoàn tất khi tất cả điều kiện sau đạt được:
 - Raw landing output dùng bind mount `./storage/raw` trên VPS thay cho Docker
   named volume, giúp inspect và backup trực tiếp từ host; runtime payloads vẫn
   bị Git ignore.
+- Cấu hình được tách thành `.env` cho deployment/infrastructure và `config.yml`
+  được version control cho operating policy (batch mã crawl, provider, partition
+  start/timezone, giờ và trạng thái schedule mặc định).
 
 ---
 

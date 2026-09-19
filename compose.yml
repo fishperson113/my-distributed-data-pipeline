@@ -8,14 +8,12 @@ x-dagster-environment: &dagster-environment
   POSTGRES_DB: ${POSTGRES_DB:-dagster}
   POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
   POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-  VNSTOCK_PROVIDER: ${VNSTOCK_PROVIDER:-kbs}
   VNSTOCK_TELEMETRY: ${VNSTOCK_TELEMETRY:-off}
   SSI_HISTORY_URL: ${SSI_HISTORY_URL:-https://iboard-api.ssi.com.vn/statistics/charts/history}
   SOURCE_HTTP_TIMEOUT_SECONDS: ${SOURCE_HTTP_TIMEOUT_SECONDS:-30}
   SOURCE_HTTP_MAX_ATTEMPTS: ${SOURCE_HTTP_MAX_ATTEMPTS:-3}
   RAW_STORAGE_PATH: ${RAW_STORAGE_PATH:-/opt/dagster/app/storage/raw}
-  STOCK_SYMBOLS: ${STOCK_SYMBOLS:-FPT}
-  FUND_SYMBOL: ${FUND_SYMBOL:-E1VFVN30}
+  PIPELINE_CONFIG_PATH: ${PIPELINE_CONFIG_PATH:-/opt/dagster/app/config.yml}
 
 x-dagster-service: &dagster-service
   image: my-distributed-data-pipeline:${IMAGE_TAG:-local}

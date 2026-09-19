@@ -38,8 +38,6 @@ Phase này chưa triển khai data pipeline thật.
 
 ### Ngoài phạm vi
 
-- Chưa triển khai `vnstock` client.
-- Chưa triển khai SSI fund/ETF client.
 - Chưa tạo stock hoặc fund assets thật.
 - Chưa tạo Bronze database hoặc Bronze migrations.
 - Chưa triển khai dbt hoặc `dagster-dbt`.
@@ -51,6 +49,18 @@ Phase này chưa triển khai data pipeline thật.
 - Chưa triển khai PostgreSQL backup automation.
 
 Các khu vực chưa được triển khai chỉ có `.gitkeep` để giữ vị trí trong repository.
+
+### Phần mở rộng đã được duyệt: standalone source probes
+
+Phase 1 được phép bổ sung hai source adapter chạy độc lập để xác minh upstream trước khi thiết kế Dagster assets và Bronze persistence:
+
+- `vnstock` daily stock OHLCV probe.
+- SSI `E1VFVN30` daily fund/ETF history probe.
+- JSON raw output nằm dưới `storage/raw/` và không được commit.
+- Source logic nằm trong `src/data_pipeline/ingestion/` và không import Dagster.
+- `scripts/` chỉ chứa CLI wrappers; Dagster assets tương lai gọi lại cùng source functions.
+
+Phần mở rộng này chưa bao gồm schedules, partitions, database loading hoặc Bronze migrations.
 
 ---
 
@@ -645,7 +655,7 @@ Phase 1 hoàn tất khi tất cả điều kiện sau đạt được:
 - [x] dbt directory chỉ chứa `.gitkeep`.
 - [x] migrations directory chỉ chứa `.gitkeep`.
 - [x] notebooks directory chỉ chứa `.gitkeep`.
-- [x] Không có stock/fund ingestion implementation trong Phase 1.
+- [x] Chưa có stock/fund Dagster assets hoặc database loading trong Phase 1.
 - [ ] README và VPS deployment guide phản ánh đúng command thực tế.
 
 ### Verification status sau lần init đầu tiên
@@ -656,6 +666,21 @@ Phase 1 hoàn tất khi tất cả điều kiện sau đạt được:
 - `docker compose config --quiet`: thành công với environment validation tạm thời.
 - Docker image build và runtime verification: chưa thực hiện được vì Docker Desktop Linux engine không chạy trên máy local tại thời điểm kiểm tra.
 - VPS deployment verification: chưa thực hiện.
+
+### Verification status của standalone source probes
+
+- `vnstock 4.0.8` và `httpx 0.28.1` được pin trong `uv.lock`.
+- Unit tests cho stock và fund adapters: thành công.
+- Live `FPT` crawl qua vnstock/KBS từ `2026-09-01` đến `2026-09-19`: thành công, 12 records.
+- Live `E1VFVN30` crawl qua SSI trong cùng khoảng ngày: thành công, 12 records.
+- Hai source cùng trả coverage từ `2026-09-03` đến `2026-09-18` trong lần kiểm tra.
+- Raw live-test outputs được lưu dưới `storage/raw/` và bị Git ignore.
+- Source runtime defaults đã được tập trung trong `.env`/`.env.example` và được
+  dùng chung bởi standalone scripts; CLI arguments vẫn override theo từng run.
+- `uv run pytest -q`: thành công, `8 passed` sau khi bổ sung validation cho
+  source environment settings.
+- `docker compose config --quiet`: thành công với `.env` local; các source
+  settings đã được truyền vào Dagster containers để tái sử dụng khi tạo assets.
 
 ---
 

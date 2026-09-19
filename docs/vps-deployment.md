@@ -21,6 +21,10 @@ sh ./scripts/deploy.sh
 sh ./scripts/smoke-test.sh
 ```
 
+The smoke test waits for up to 60 seconds for the webserver to become ready.
+If Docker requires elevated access for the current user, run both scripts with
+`sudo sh` or configure membership in the local `docker` group.
+
 Open the Dagster UI only from an allowed network or through an SSH tunnel:
 
 ```bash

@@ -12,6 +12,9 @@ dependencies = [
     "dagster==1.13.23",
     "dagster-postgres==0.29.23",
     "dagster-webserver==1.13.23",
+    "httpx==0.28.1",
+    "python-dotenv==1.2.3",
+    "vnstock==4.0.8",
 ]
 
 [dependency-groups]

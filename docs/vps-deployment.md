@@ -60,3 +60,29 @@ docker compose restart dagster-webserver dagster-daemon dagster-code
 Confirm that the previous run remains visible in the UI.
 
 Do not delete the `dagster-postgres-data` volume during normal deployment.
+
+## Raw landing files
+
+Dagster bind-mounts the repository's `storage/raw/` directory to
+`/opt/dagster/app/storage/raw` in its containers. The deploy script creates the
+directory and, when run with `sudo`, assigns it to the container's non-root UID
+`10001`. Inspect raw payloads directly from the repository:
+
+```bash
+find storage/raw -type f
+```
+
+If this repository previously used the `dagster-raw-data` named volume, migrate
+its existing files once before removing that volume:
+
+```bash
+sudo mkdir -p storage/raw
+sudo docker run --rm \
+  -v my-distributed-data-pipeline_dagster-raw-data:/from:ro \
+  -v "$PWD/storage/raw:/to" \
+  alpine sh -c 'cp -a /from/. /to/'
+sudo chown -R 10001:10001 storage/raw
+```
+
+After verifying the copied files, the old named volume is no longer used by
+Compose. Do not remove it until the migration has been verified.

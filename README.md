@@ -101,9 +101,12 @@ The `daily_market_ingestion` job selects both assets. Its
 the previous day's partition. The schedule is intentionally deployed in the
 stopped state; review it in Dagster UI and enable it when ready.
 
-Raw files are retained in the `dagster-raw-data` Docker volume on the VPS. They
-are landing payloads, not Bronze database tables; Bronze persistence remains a
-later implementation phase.
+Raw files are bind-mounted to `storage/raw/` in the repository on the VPS, with
+the same path mounted at `/opt/dagster/app/storage/raw` inside Dagster containers.
+They therefore remain directly inspectable and can be backed up with ordinary
+host filesystem tools. Runtime payloads remain ignored by Git; only `.gitkeep`
+is tracked. These are landing payloads, not Bronze database tables; Bronze
+persistence remains a later implementation phase.
 
 ## Documentation
 

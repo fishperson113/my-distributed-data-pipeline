@@ -688,6 +688,9 @@ Phase 1 hoàn tất khi tất cả điều kiện sau đạt được:
 - Stock adapter dùng date range inclusive ở boundary của project và tự chuyển
   thành exclusive end date khi gọi vnstock/KBS; daily partition một ngày đã được
   live-test thành công với dữ liệu `FPT` ngày `2026-09-18`.
+- Raw landing output dùng bind mount `./storage/raw` trên VPS thay cho Docker
+  named volume, giúp inspect và backup trực tiếp từ host; runtime payloads vẫn
+  bị Git ignore.
 
 ---
 

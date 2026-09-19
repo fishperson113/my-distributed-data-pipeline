@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dagster
+.dagster/
+dagster_home/
+
+# dbt generated files (future phase)
+src/data_pipeline/dbt/target/
+src/data_pipeline/dbt/logs/
+src/data_pipeline/dbt/dbt_packages/
+
+# Runtime data
+storage/raw/**
+storage/exports/**
+storage/backups/**
+!storage/raw/.gitkeep
+!storage/exports/.gitkeep
+!storage/backups/.gitkeep
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+

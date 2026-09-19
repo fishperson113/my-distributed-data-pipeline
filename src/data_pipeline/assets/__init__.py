@@ -1,0 +1,2 @@
+"""Dagster asset definitions."""
+

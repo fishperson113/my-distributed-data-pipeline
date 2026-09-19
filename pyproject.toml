@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-distributed-data-pipeline"
+version = "0.1.0"
+description = "Self-hosted Dagster application for a multi-source data pipeline."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "dagster==1.13.23",
+    "dagster-postgres==0.29.23",
+    "dagster-webserver==1.13.23",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/data_pipeline"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+

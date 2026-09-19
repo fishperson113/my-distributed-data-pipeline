@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable, Iterable
+from datetime import date, timedelta
 from typing import Any
 
 from data_pipeline.ingestion.common.models import RawExtraction
@@ -30,6 +31,30 @@ def _frame_records(frame: Any) -> list[dict[str, Any]]:
     return json.loads(frame.to_json(orient="records", date_format="iso"))
 
 
+def _inclusive_date_range(start: str, end: str) -> tuple[date, date, str]:
+    """Validate an inclusive range and derive the provider's exclusive end date."""
+
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+    if end_date < start_date:
+        raise ValueError("The end date must be on or after the start date.")
+    return start_date, end_date, (end_date + timedelta(days=1)).isoformat()
+
+
+def _within_requested_range(record: dict[str, Any], start: date, end: date) -> bool:
+    """Keep provider rows inside the public inclusive date contract."""
+
+    value = record.get("time")
+    if not isinstance(value, str) or len(value) < 10:
+        return True
+
+    try:
+        record_date = date.fromisoformat(value[:10])
+    except ValueError:
+        return True
+    return start <= record_date <= end
+
+
 def extract_stock_daily(
     *,
     symbols: Iterable[str],
@@ -48,17 +73,22 @@ def extract_stock_daily(
     if not normalized_provider:
         raise ValueError("The vnstock provider cannot be blank.")
 
+    start_date, end_date, provider_end_exclusive = _inclusive_date_range(start, end)
     market = (market_factory or _default_market_factory)()
     records: list[dict[str, Any]] = []
 
     for symbol in normalized_symbols:
         frame = market.equity(symbol).ohlcv(
             start=start,
-            end=end,
+            end=provider_end_exclusive,
             interval="1D",
             source=normalized_provider,
         )
-        symbol_records = _frame_records(frame)
+        symbol_records = [
+            record
+            for record in _frame_records(frame)
+            if _within_requested_range(record, start_date, end_date)
+        ]
         for record in symbol_records:
             record.setdefault("symbol", symbol)
             records.append(record)
@@ -71,9 +101,9 @@ def extract_stock_daily(
             "symbols": normalized_symbols,
             "start": start,
             "end": end,
+            "provider_end_exclusive": provider_end_exclusive,
             "interval": "1D",
         },
         records=records,
         source_payload=records,
     )
-

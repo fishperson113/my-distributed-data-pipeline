@@ -46,6 +46,36 @@ def test_stock_extraction_produces_json_safe_records() -> None:
     assert extraction.record_count == 1
     assert extraction.records[0]["symbol"] == "FPT"
     assert extraction.records[0]["time"].startswith("2026-09-18")
+    assert extraction.request["provider_end_exclusive"] == "2026-09-20"
+
+
+def test_stock_extraction_uses_exclusive_provider_end_and_filters_extra_rows() -> None:
+    calls: list[dict[str, object]] = []
+
+    class CapturingEquity:
+        def ohlcv(self, **kwargs: object) -> pd.DataFrame:
+            calls.append(kwargs)
+            return pd.DataFrame(
+                [
+                    {"time": pd.Timestamp("2026-09-18"), "close": 100},
+                    {"time": pd.Timestamp("2026-09-19"), "close": 999},
+                ]
+            )
+
+    class CapturingMarket:
+        def equity(self, _: str) -> CapturingEquity:
+            return CapturingEquity()
+
+    extraction = extract_stock_daily(
+        symbols=["FPT"],
+        start="2026-09-18",
+        end="2026-09-18",
+        market_factory=CapturingMarket,
+    )
+
+    assert calls[0]["end"] == "2026-09-19"
+    assert extraction.record_count == 1
+    assert extraction.records[0]["close"] == 100
 
 
 def test_fund_extraction_preserves_payload_and_builds_records() -> None:
@@ -108,4 +138,3 @@ def test_fund_extraction_rejects_mismatched_arrays() -> None:
                 end="2026-09-19",
                 client=client,
             )
-

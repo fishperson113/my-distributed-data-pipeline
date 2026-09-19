@@ -16,7 +16,7 @@ COPY src ./src
 
 RUN uv sync --frozen --no-dev \
     && useradd --create-home --uid 10001 dagster \
-    && mkdir -p /opt/dagster/dagster_home /opt/dagster/compute_logs \
+    && mkdir -p /opt/dagster/dagster_home /opt/dagster/compute_logs /opt/dagster/app/storage/raw \
     && chown -R dagster:dagster /opt/dagster
 
 COPY --chown=dagster:dagster docker ./docker
@@ -27,4 +27,3 @@ USER dagster
 
 ENTRYPOINT ["/opt/dagster/app/docker/entrypoint.sh"]
 CMD ["dagster", "api", "grpc", "--host", "0.0.0.0", "--port", "4000", "--module-name", "data_pipeline.definitions"]
-

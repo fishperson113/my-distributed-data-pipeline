@@ -681,6 +681,13 @@ Phase 1 hoàn tất khi tất cả điều kiện sau đạt được:
   source environment settings.
 - `docker compose config --quiet`: thành công với `.env` local; các source
   settings đã được truyền vào Dagster containers để tái sử dụng khi tạo assets.
+- Đã đăng ký `raw/stock_daily` và `raw/fund_daily` theo daily partitions, job
+  `daily_market_ingestion`, và schedule 06:00 `Asia/Ho_Chi_Minh` chọn partition
+  của ngày trước đó. Schedule mặc định ở trạng thái stopped để bật có chủ đích
+  trên Dagster UI.
+- Stock adapter dùng date range inclusive ở boundary của project và tự chuyển
+  thành exclusive end date khi gọi vnstock/KBS; daily partition một ngày đã được
+  live-test thành công với dữ liệu `FPT` ngày `2026-09-18`.
 
 ---
 

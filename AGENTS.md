@@ -6,6 +6,9 @@ The repository is in Phase 1. Work should prioritize a reliable self-hosted Dags
 
 Do not implement stock ingestion, fund ingestion, Bronze migrations, or dbt unless the active task explicitly expands the phase scope.
 
+A local-only ELT flow (dbt, DuckDB, MongoDB, a separate warehouse Postgres) was added as an explicit scope expansion; see `artifacts/devlog/module-4-bronze-design-supersession.md` and `docs/local-elt.md`.
+It is standalone and not yet wired into Dagster assets, jobs, or schedules.
+
 ## Architecture
 
 - `data_pipeline.definitions:defs` is the canonical Dagster code-location entry point.

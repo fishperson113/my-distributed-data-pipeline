@@ -26,9 +26,11 @@ src/data_pipeline/dbt/dbt_packages/
 storage/raw/**
 storage/exports/**
 storage/backups/**
+storage/warehouse/**
 !storage/raw/.gitkeep
 !storage/exports/.gitkeep
 !storage/backups/.gitkeep
+!storage/warehouse/.gitkeep
 
 # Notebooks
 .ipynb_checkpoints/
@@ -39,3 +41,6 @@ storage/backups/**
 .DS_Store
 Thumbs.db
 
+CLAUDE.md
+.agents
+.claude

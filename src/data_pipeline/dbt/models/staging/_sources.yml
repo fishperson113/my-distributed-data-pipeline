@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Bronze raw landing tables loaded from Mongo by scripts/load_duckdb_raw.py.
+    tables:
+      - name: stock_daily
+        description: One row per vnstock OHLCV record, as landed in Mongo.
+      - name: fund_daily
+        description: One row per SSI iBoard fund/ETF OHLCV record, as landed in Mongo.

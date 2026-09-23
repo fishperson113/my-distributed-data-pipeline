@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_vnstock__stock_daily
+    description: Typed, one-row-per-record view over the vnstock Bronze raw table.
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: trade_date
+        tests: [not_null]
+
+  - name: stg_ssi__fund_daily
+    description: Typed, one-row-per-record view over the SSI iBoard Bronze raw table.
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: trade_date
+        tests: [not_null]

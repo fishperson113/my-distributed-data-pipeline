@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: exp_vn30_vs_fund_daily
+    description: Exploratory join of stock daily closes against the E1VFVN30 fund on trade_date.
+    columns:
+      - name: trade_date
+        tests: [not_null]
+      - name: stock_symbol
+        tests: [not_null]

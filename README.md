@@ -4,18 +4,22 @@ Self-hosted Dagster application for a multi-source data pipeline running on a pe
 
 ## Current phase
 
-Phase 1 establishes the deployment foundation only:
+Phase 1 prioritizes a reliable self-hosted Dagster deployment on the VPS:
 
 - Dagster webserver, daemon, and gRPC code server.
 - PostgreSQL-backed Dagster metadata.
 - One deployment healthcheck asset.
 - Docker Compose deployment for local verification and the VPS.
 
-Stock and fund raw landing assets are now available. Bronze database migrations,
-notebooks, and dbt remain deferred.
-
+Stock and fund raw landing assets are available as an explicit scope expansion.
 Standalone source probes call the same reusable ingestion modules as the Dagster
 assets, allowing source connectivity to be tested without running Dagster.
+
+A separate local-only ELT flow is also available for development. It uses MongoDB,
+DuckDB, dbt, and a separate warehouse Postgres to transform raw landing files,
+but it is not wired into Dagster assets, jobs, schedules, `compose.yml`, or the
+VPS deployment. Dagster metadata and pipeline/warehouse data must remain in
+separate database schemas.
 
 ## Local setup
 
@@ -123,8 +127,9 @@ Raw files are bind-mounted to `storage/raw/` in the repository on the VPS, with
 the same path mounted at `/opt/dagster/app/storage/raw` inside Dagster containers.
 They therefore remain directly inspectable and can be backed up with ordinary
 host filesystem tools. Runtime payloads remain ignored by Git; only `.gitkeep`
-is tracked. These are landing payloads, not Bronze database tables; Bronze
-persistence remains a later implementation phase.
+is tracked. In the VPS/Dagster deployment these are landing payloads, not Bronze
+database tables. The local-only ELT flow can mirror them into MongoDB as a
+standalone Bronze development layer.
 
 ## Documentation
 
@@ -132,5 +137,7 @@ persistence remains a later implementation phase.
 - [Architecture](docs/architecture.md)
 - [Local development](docs/local-development.md)
 - [VPS deployment](docs/vps-deployment.md)
+- [Local ELT development](docs/local-elt.md)
 - [Module 4 proposal](artifacts/devlog/module-4-proposal.md)
 - [Bronze design review](artifacts/devlog/module-4-bronze-design-review.md)
+- [Bronze design supersession](artifacts/devlog/module-4-bronze-design-supersession.md)

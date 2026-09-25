@@ -15,11 +15,11 @@ Stock and fund raw landing assets are available as an explicit scope expansion.
 Standalone source probes call the same reusable ingestion modules as the Dagster
 assets, allowing source connectivity to be tested without running Dagster.
 
-A separate local-only ELT flow is also available for development. It uses MongoDB,
-DuckDB, dbt, and a separate warehouse Postgres to transform raw landing files,
-but it is not wired into Dagster assets, jobs, schedules, `compose.yml`, or the
-VPS deployment. Dagster metadata and pipeline/warehouse data must remain in
-separate database schemas.
+Postgres Bronze is deployed separately from Dagster metadata. Daily Dagster
+assets persist raw stock and fund envelopes into its `bronze` schema after the
+filesystem landing step. dbt transforms directly from Postgres Bronze into
+Postgres staging and marts. Mongo remains an optional compatibility utility,
+outside the production pipeline.
 
 ## Local setup
 
@@ -71,10 +71,12 @@ Explicit CLI arguments still override source defaults for an individual probe.
 
 ## Scheduled market ingestion
 
-Dagster registers two daily-partitioned raw landing assets:
+Dagster registers four daily-partitioned assets:
 
 - `raw/stock_daily`, using the stock batch in `config.yml`.
 - `raw/fund_daily`, using the fund symbol in `config.yml`.
+- `bronze/stock_daily`, which writes the landed stock envelope to Postgres.
+- `bronze/fund_daily`, which writes the landed fund envelope to Postgres.
 
 Configure operating policy in `config.yml`:
 
@@ -115,7 +117,7 @@ window `[2026-09-18, 2026-09-19)` and stores only records for `2026-09-18`.
 `ingestion.fund.symbol` is deliberately singular in the current implementation.
 It accepts one fund/ETF ticker, so `E1VFVN30` crawls only that ticker through SSI.
 
-The `daily_market_ingestion` job selects both assets. Its
+The `daily_market_ingestion` job selects all four assets. Its
 `daily_market_ingestion_schedule` reads its hour/minute from `config.yml`; its
 timezone comes from the daily partition policy. With the example above it runs
 at 06:00 in `Asia/Ho_Chi_Minh` and targets the previous day's partition.
@@ -127,9 +129,16 @@ Raw files are bind-mounted to `storage/raw/` in the repository on the VPS, with
 the same path mounted at `/opt/dagster/app/storage/raw` inside Dagster containers.
 They therefore remain directly inspectable and can be backed up with ordinary
 host filesystem tools. Runtime payloads remain ignored by Git; only `.gitkeep`
-is tracked. In the VPS/Dagster deployment these are landing payloads, not Bronze
-database tables. The local-only ELT flow can mirror them into MongoDB as a
-standalone Bronze development layer.
+is tracked. The production compose stack also runs a dedicated warehouse
+Postgres service. It applies migrations in `migrations/` before Dagster starts,
+then writes append-only raw records to `bronze.stock` and `bronze.fund`, linked
+to `bronze.ingestion_batch`. Dagster metadata and
+warehouse data therefore remain in separate databases. The legacy local ELT
+flow can still mirror landing payloads into MongoDB.
+
+`storage/` is reserved for durable pipeline files only: `storage/raw/` for
+source envelopes and `storage/backups/` for operator-managed backups. Postgres
+owns warehouse data in a Docker volume.
 
 ## Documentation
 

@@ -1,1 +1,1 @@
-"""Local ELT warehouse: Mongo raw landing, DuckDB transform, Postgres serving."""
+"""Warehouse persistence adapters for Postgres Bronze and optional Mongo mirroring."""

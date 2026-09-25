@@ -7,7 +7,7 @@ from pathlib import Path
 
 from data_pipeline.config import InfrastructureSettings
 from data_pipeline.warehouse.mongo_sink import load_raw_files_to_mongo
-from data_pipeline.warehouse.settings import WarehouseSettings
+from data_pipeline.warehouse.settings import MongoSettings
 
 
 def main() -> int:
@@ -23,11 +23,11 @@ def main() -> int:
     args = parser.parse_args()
 
     infrastructure = InfrastructureSettings.from_env()
-    warehouse = WarehouseSettings.from_env()
+    mongo = MongoSettings.from_env()
     upserted = load_raw_files_to_mongo(
         raw_storage_path=infrastructure.raw_storage_path,
-        mongo_uri=warehouse.mongo_uri,
-        mongo_database=warehouse.mongo_database,
+        mongo_uri=mongo.mongo_uri,
+        mongo_database=mongo.mongo_database,
         json_paths=args.path,
     )
     print(f"mongo load succeeded: upserted={upserted}")

@@ -1,26 +1,22 @@
-"""Environment settings for the local ELT warehouse (Mongo/DuckDB/Postgres)."""
+"""Environment settings for optional Mongo compatibility utilities."""
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
-class WarehouseSettings:
-    """Connection settings for the ELT warehouse, distinct from Dagster's own Postgres."""
+class MongoSettings:
+    """Connection settings for the optional Mongo raw-payload mirror."""
 
     mongo_uri: str
     mongo_database: str
-    duckdb_path: Path
-    warehouse_postgres_dsn: str
-
     @classmethod
-    def from_env(cls) -> "WarehouseSettings":
-        """Load warehouse settings from process env with a `.env` fallback."""
+    def from_env(cls) -> "MongoSettings":
+        """Load Mongo settings from process env with a `.env` fallback."""
 
         load_dotenv(override=False)
 
@@ -32,13 +28,24 @@ class WarehouseSettings:
         if not mongo_database:
             raise ValueError("MONGO_DATABASE cannot be blank.")
 
-        warehouse_postgres_dsn = os.getenv("WAREHOUSE_POSTGRES_DSN", "").strip()
-        if not warehouse_postgres_dsn:
-            raise ValueError("WAREHOUSE_POSTGRES_DSN cannot be blank.")
-
         return cls(
             mongo_uri=mongo_uri,
             mongo_database=mongo_database,
-            duckdb_path=Path(os.getenv("DUCKDB_PATH", "storage/warehouse/warehouse.duckdb")),
-            warehouse_postgres_dsn=warehouse_postgres_dsn,
         )
+
+
+@dataclass(frozen=True)
+class PostgresBronzeSettings:
+    """Connection settings for the Postgres Bronze warehouse."""
+
+    warehouse_postgres_dsn: str
+
+    @classmethod
+    def from_env(cls) -> "PostgresBronzeSettings":
+        """Load the Bronze Postgres DSN without requiring legacy ELT settings."""
+
+        load_dotenv(override=False)
+        warehouse_postgres_dsn = os.getenv("WAREHOUSE_POSTGRES_DSN", "").strip()
+        if not warehouse_postgres_dsn:
+            raise ValueError("WAREHOUSE_POSTGRES_DSN cannot be blank.")
+        return cls(warehouse_postgres_dsn=warehouse_postgres_dsn)

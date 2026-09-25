@@ -13,6 +13,8 @@ WORKDIR /opt/dagster/app
 
 COPY pyproject.toml uv.lock README.md config.yml ./
 COPY src ./src
+COPY migrations ./migrations
+COPY scripts ./scripts
 
 RUN uv sync --frozen --no-dev \
     && useradd --create-home --uid 10001 dagster \

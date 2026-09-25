@@ -2,6 +2,11 @@ stock_etl:
   target: dev
   outputs:
     dev:
-      type: duckdb
-      path: "{{ env_var('DUCKDB_PATH', 'storage/warehouse/warehouse.duckdb') }}"
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('WAREHOUSE_POSTGRES_PORT', '5433') | int }}"
+      user: "{{ env_var('WAREHOUSE_POSTGRES_USER', 'warehouse') }}"
+      pass: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB', 'warehouse') }}"
+      schema: public
       threads: 4

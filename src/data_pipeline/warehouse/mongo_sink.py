@@ -1,10 +1,9 @@
 """Mirror `storage/raw` JSON envelopes into MongoDB as the Bronze raw landing layer.
 
-The filesystem envelope remains the source of truth; Mongo is a queryable,
-dataset-aligned mirror that DuckDB reads from to build Silver/Gold via dbt.
-Each Mongo document is one logical record (not one envelope), matching the
-per-record raw-landing shape used by dataset-aligned Bronze tables, upserted
-by a deterministic natural key so reruns stay idempotent.
+The filesystem envelope remains the source of truth. Mongo is an optional,
+dataset-aligned compatibility mirror. Each document is one logical record
+(not one envelope), upserted by a deterministic natural key so reruns stay
+idempotent.
 """
 
 from __future__ import annotations

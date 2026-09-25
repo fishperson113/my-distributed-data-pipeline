@@ -14,6 +14,7 @@ x-dagster-environment: &dagster-environment
   SOURCE_HTTP_MAX_ATTEMPTS: ${SOURCE_HTTP_MAX_ATTEMPTS:-3}
   RAW_STORAGE_PATH: ${RAW_STORAGE_PATH:-/opt/dagster/app/storage/raw}
   PIPELINE_CONFIG_PATH: ${PIPELINE_CONFIG_PATH:-/opt/dagster/app/config.yml}
+  WAREHOUSE_POSTGRES_DSN: postgresql://${WAREHOUSE_POSTGRES_USER:-warehouse}:${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}@warehouse-postgres:5432/${WAREHOUSE_POSTGRES_DB:-warehouse}
 
 x-dagster-service: &dagster-service
   image: my-distributed-data-pipeline:${IMAGE_TAG:-local}
@@ -41,6 +42,35 @@ services:
     networks:
       - dagster-network
 
+  warehouse-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-warehouse}
+      POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-warehouse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    volumes:
+      - warehouse-postgres-data:/var/lib/postgresql/data
+    networks:
+      - dagster-network
+
+  warehouse-migrations:
+    <<: *dagster-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: ["python", "scripts/migrate_warehouse.py"]
+    restart: "no"
+    depends_on:
+      warehouse-postgres:
+        condition: service_healthy
+
   dagster-code:
     <<: *dagster-service
     build:
@@ -58,6 +88,11 @@ services:
       - data_pipeline.definitions
     expose:
       - "${DAGSTER_CODE_PORT:-4000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      warehouse-migrations:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -118,6 +153,7 @@ services:
 
 volumes:
   dagster-postgres-data:
+  warehouse-postgres-data:
   dagster-compute-logs:
 
 networks:

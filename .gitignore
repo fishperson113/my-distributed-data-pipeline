@@ -24,13 +24,10 @@ src/data_pipeline/dbt/dbt_packages/
 
 # Runtime data
 storage/raw/**
-storage/exports/**
 storage/backups/**
-storage/warehouse/**
 !storage/raw/.gitkeep
-!storage/exports/.gitkeep
 !storage/backups/.gitkeep
-!storage/warehouse/.gitkeep
+
 
 # Notebooks
 .ipynb_checkpoints/

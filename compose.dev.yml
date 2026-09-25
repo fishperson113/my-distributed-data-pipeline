@@ -1,7 +1,7 @@
 name: my-distributed-data-pipeline-elt-dev
 
-# Local ELT development stack only: Mongo (Bronze raw landing) and a
-# warehouse Postgres (dbt marts serving layer).
+# Local compatibility stack: optional Mongo mirroring and a Postgres instance
+# for running dbt from the host.
 # Independent of compose.yml, which runs Dagster's own Postgres metadata
 # database. The two Postgres instances must never share a schema.
 # Not used on the VPS; scripts/deploy.sh does not touch this file.
@@ -33,6 +33,7 @@ services:
       start_period: 5s
     volumes:
       - elt-warehouse-postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
 
 volumes:
   elt-mongo-data:

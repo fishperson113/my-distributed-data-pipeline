@@ -28,6 +28,8 @@ def test_daily_market_assets_job_and_schedule_are_registered() -> None:
     asset_keys = defs.resolve_asset_graph().get_all_asset_keys()
     assert dg.AssetKey(["raw", "stock_daily"]) in asset_keys
     assert dg.AssetKey(["raw", "fund_daily"]) in asset_keys
+    assert dg.AssetKey(["bronze", "stock_daily"]) in asset_keys
+    assert dg.AssetKey(["bronze", "fund_daily"]) in asset_keys
 
     job = defs.resolve_job_def("daily_market_ingestion")
     assert job.partitions_def is not None

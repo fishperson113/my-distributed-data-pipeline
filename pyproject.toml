@@ -23,8 +23,7 @@ dev = [
     "pytest>=8.3,<10",
 ]
 elt = [
-    "dbt-duckdb>=1.8,<2",
-    "duckdb>=1.0,<2",
+    "dbt-postgres>=1.8,<2",
     "pymongo>=4.8,<5",
 ]
 

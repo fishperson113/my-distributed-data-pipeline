@@ -7,15 +7,6 @@ name: my-distributed-data-pipeline-elt-dev
 # Not used on the VPS; scripts/deploy.sh does not touch this file.
 
 services:
-  mongo:
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set in .env}
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
-    volumes:
-      - elt-mongo-data:/data/db
 
   warehouse-postgres:
     image: postgres:16-alpine
@@ -36,5 +27,4 @@ services:
       - ./migrations:/docker-entrypoint-initdb.d:ro
 
 volumes:
-  elt-mongo-data:
   elt-warehouse-postgres-data:

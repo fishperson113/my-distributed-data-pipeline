@@ -17,10 +17,29 @@ It is standalone and not yet wired into Dagster assets, jobs, or schedules.
 - Dagster metadata and future pipeline data must not share a database schema.
 - Secrets belong in environment variables and must not be committed.
 
+## Infrastructure wrappers
+
+- `Makefile` and `make.ps1` are the supported local entrypoints for Docker Compose operations and manual source probes.
+- `Makefile` is for Unix-like shells where `make` is available.
+- `make.ps1` is for Windows PowerShell.
+- `compose.yml` remains the source of truth for the production-shaped Dagster stack.
+- `compose.dev.yml` remains the source of truth for the local ELT compatibility stack.
+- Use `make prod-up` or `./make.ps1 prod-up` to start the complete production-shaped stack.
+- Use `make dev-up` or `./make.ps1 dev-up` to start the complete local ELT compatibility stack.
+- Use `make all-up` or `./make.ps1 all-up` only when both stacks are intentionally needed.
+- For partial startup, pass explicit services with `SERVICES="service ..."` in Make or `-Services service,...` in PowerShell.
+- Examples are `make prod-up SERVICES="postgres warehouse-postgres"` and `./make.ps1 dev-up -Services mongo`.
+- `ingest-stock` and `ingest-fund` run the standalone source probes; `ingest-market` runs both in sequence.
+- Pass probe arguments through `STOCK_ARGS` and `FUND_ARGS` in Make, or `-StockArgs` and `-FundArgs` in PowerShell.
+- Do not add new infrastructure wrapper targets that hide materially different behavior from the underlying Compose files.
+- Prefer documenting any new wrapper option in both `README.md` and this file when the option changes how infrastructure is started, stopped, or validated.
+
 ## Verification
 
 - Run `uv run pytest` after Python changes.
-- Validate Compose with `docker compose config` after deployment configuration changes.
+- Validate Compose with `make config` and `./make.ps1 config` after deployment configuration changes when the required tools are available.
+- If `make` is unavailable, validate the Makefile changes by inspection and run the equivalent `docker compose -f compose.yml config` and `docker compose -f compose.dev.yml config` commands.
+- If PowerShell is unavailable, validate `make.ps1` by inspection and run the equivalent Docker Compose config commands.
 - Do not mark VPS-only checks complete until they have actually run on the VPS.
 
 <!-- vnai-bootstrap | auto-generated -->

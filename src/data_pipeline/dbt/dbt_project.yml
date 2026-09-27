@@ -4,8 +4,6 @@ config-version: 2
 profile: "stock_etl"
 
 model-paths: ["models"]
-target-path: "target"
-log-path: "logs"
 clean-targets: ["target", "dbt_packages"]
 
 models:
@@ -16,3 +14,5 @@ models:
     marts:
       +materialized: table
       +schema: marts
+flags:
+  require_generic_test_arguments_property: true

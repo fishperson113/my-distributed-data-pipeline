@@ -25,7 +25,8 @@ RUN uv sync --frozen --no-dev \
 # prepare_if_dev() is a no-op. A dummy password satisfies the profile; dbt parse
 # does not connect to the database. Re-own the project for runtime dbt writes.
 RUN WAREHOUSE_POSTGRES_PASSWORD=build \
-    dbt parse --project-dir src/data_pipeline/dbt --profiles-dir src/data_pipeline/dbt \
+    dbt parse --no-partial-parse \
+    --project-dir src/data_pipeline/dbt --profiles-dir src/data_pipeline/dbt \
     && chown -R dagster:dagster /opt/dagster/app/src/data_pipeline/dbt
 
 COPY --chown=dagster:dagster docker ./docker

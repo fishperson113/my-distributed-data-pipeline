@@ -1,0 +1,12 @@
+# dbt build artifacts must not be baked into the image; a stale
+# target/partial_parse.msgpack breaks `dbt parse` at build time.
+src/data_pipeline/dbt/target/
+src/data_pipeline/dbt/logs/
+src/data_pipeline/dbt/dbt_packages/
+
+# Python and tooling caches
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.venv/
+.git/

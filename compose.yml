@@ -18,6 +18,8 @@ x-dagster-environment: &dagster-environment
   WAREHOUSE_POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-warehouse}
   WAREHOUSE_POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}
   WAREHOUSE_POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-warehouse}
+  # dbt inside the containers targets the internal warehouse (warehouse-postgres:5432).
+  DBT_TARGET: prod
 
 x-dagster-service: &dagster-service
   image: my-distributed-data-pipeline:${IMAGE_TAG:-local}

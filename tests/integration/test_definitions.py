@@ -26,10 +26,12 @@ def test_daily_market_assets_job_and_schedule_are_registered() -> None:
     """Ensure the partitioned ingestion topology is visible to Dagster."""
 
     asset_keys = defs.resolve_asset_graph().get_all_asset_keys()
-    assert dg.AssetKey(["raw", "stock_daily"]) in asset_keys
-    assert dg.AssetKey(["raw", "fund_daily"]) in asset_keys
     assert dg.AssetKey(["bronze", "stock_daily"]) in asset_keys
     assert dg.AssetKey(["bronze", "fund_daily"]) in asset_keys
+    # dbt models are registered as downstream assets of Bronze, keyed by schema.
+    assert dg.AssetKey(["staging", "stg_vnstock__stock_daily"]) in asset_keys
+    assert dg.AssetKey(["staging", "stg_ssi__fund_daily"]) in asset_keys
+    assert dg.AssetKey(["marts", "exp_vn30_vs_fund_daily"]) in asset_keys
 
     job = defs.resolve_job_def("daily_market_ingestion")
     assert job.partitions_def is not None

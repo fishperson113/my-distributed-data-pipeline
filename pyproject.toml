@@ -10,12 +10,15 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "dagster==1.13.23",
+    "dagster-dbt==0.29.23",
     "dagster-postgres==0.29.23",
     "dagster-webserver==1.13.23",
     "dbt-postgres",
     "httpx==0.28.1",
     "python-dotenv==1.2.3",
-    "pyyaml==6.0.3"
+    "pyyaml==6.0.3",
+    "vnstock>=4.0.9",
+    "vnai>=2.6.2"
 ]
 
 [dependency-groups]
@@ -26,6 +29,12 @@ elt = [
     "dbt-postgres>=1.8,<2",
     "pymongo>=4.8,<5",
 ]
+
+# vnstock and vnai were removed from PyPI (~2026-09-25). They are now served from
+# the official Vnstock package index. Community tier resolves without an API key.
+[[tool.uv.index]]
+name = "vnstock"
+url = "https://vnstocks.com/api/simple"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/data_pipeline"]

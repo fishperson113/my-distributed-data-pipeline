@@ -4,7 +4,8 @@ param(
         'prod-up', 'prod-down', 'prod-ps', 'prod-logs', 'prod-config',
         'dev-up', 'dev-down', 'dev-ps', 'dev-logs', 'dev-config',
         'all-up', 'all-down', 'all-ps', 'config',
-        'ingest-stock', 'ingest-fund', 'ingest-market'
+        'ingest-stock', 'ingest-fund', 'ingest-market',
+        'load-raw', 'load-raw-prod', 'dbt-debug', 'dbt-run', 'dbt-test'
     )]
     [string]$Target = 'help',
 
@@ -18,7 +19,10 @@ param(
     [string]$Uv = 'uv',
     [string[]]$IngestArgs = @(),
     [string[]]$StockArgs = @(),
-    [string[]]$FundArgs = @()
+    [string[]]$FundArgs = @(),
+    [string[]]$LoadArgs = @(),
+    [string]$DbtDir = 'src/data_pipeline/dbt',
+    [string[]]$DbtArgs = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,6 +70,21 @@ function Invoke-Ingestion {
     )
 
     & $Uv run python $ScriptPath @Arguments
+
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
+function Invoke-Dbt {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
+        [string[]]$Arguments = @()
+    )
+
+    & $Uv run dbt $Command --project-dir $DbtDir --profiles-dir $DbtDir @Arguments
 
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -120,6 +139,13 @@ function Show-Help {
     Write-Host '  ingest-fund   Fetch fund data and write a raw JSON dump'
     Write-Host '  ingest-market Run stock ingestion, then fund ingestion'
     Write-Host ''
+    Write-Host 'ELT into the warehouse (load raw -> Bronze, then dbt transforms):'
+    Write-Host '  load-raw      Load raw JSON into the LOCAL dev Bronze (localhost:5433)'
+    Write-Host '  load-raw-prod Load raw JSON into the PROD Bronze (inside the dagster-code container)'
+    Write-Host '  dbt-debug     Check the dbt connection to the warehouse'
+    Write-Host '  dbt-run       Build dbt models (staging views + marts tables)'
+    Write-Host '  dbt-test      Run dbt tests'
+    Write-Host ''
     Write-Host 'Examples:'
     Write-Host '  ./make.ps1 prod-up'
     Write-Host '  ./make.ps1 prod-up -Services postgres,warehouse-postgres'
@@ -127,6 +153,9 @@ function Show-Help {
     Write-Host "  ./make.ps1 ingest-stock -StockArgs @('--symbol','FPT','--start','2026-09-01','--end','2026-09-19')"
     Write-Host "  ./make.ps1 ingest-fund -FundArgs @('--symbol','E1VFVN30','--start','2026-09-01','--end','2026-09-19')"
     Write-Host "  ./make.ps1 ingest-market -StockArgs @('--symbol','FPT','--start','2026-09-01','--end','2026-09-19') -FundArgs @('--symbol','E1VFVN30','--start','2026-09-01','--end','2026-09-19')"
+    Write-Host "  ./make.ps1 load-raw -LoadArgs @('--path','storage/raw/vnstock/stock_daily_2026-09-01_2026-09-19.json')"
+    Write-Host "  ./make.ps1 load-raw-prod -LoadArgs @('--path','storage/raw/vnstock/stock_daily_2026-09-01_2026-09-19.json')"
+    Write-Host "  ./make.ps1 dbt-run -DbtArgs @('--select','staging')"
 }
 
 $buildImages = $Build
@@ -169,4 +198,13 @@ switch ($Target) {
         Invoke-Ingestion -ScriptPath 'scripts/test_stock_source.py' -Arguments (Resolve-IngestionArgs -SpecificArgs $StockArgs)
         Invoke-Ingestion -ScriptPath 'scripts/test_fund_source.py' -Arguments (Resolve-IngestionArgs -SpecificArgs $FundArgs)
     }
+    'load-raw' {
+        Invoke-Ingestion -ScriptPath 'scripts/load_postgres_raw.py' -Arguments $LoadArgs
+    }
+    'load-raw-prod' {
+        Invoke-Compose $ProdComposeFile (@('exec', 'dagster-code', 'python', 'scripts/load_postgres_raw.py') + $LoadArgs)
+    }
+    'dbt-debug' { Invoke-Dbt -Command 'debug' -Arguments $DbtArgs }
+    'dbt-run' { Invoke-Dbt -Command 'run' -Arguments $DbtArgs }
+    'dbt-test' { Invoke-Dbt -Command 'test' -Arguments $DbtArgs }
 }

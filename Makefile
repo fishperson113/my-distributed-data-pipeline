@@ -1,4 +1,4 @@
-.PHONY: help prod-up prod-down prod-ps prod-logs prod-config dev-up dev-down dev-ps dev-logs dev-config all-up all-down all-ps config ingest-stock ingest-fund ingest-market
+.PHONY: help prod-up prod-down prod-ps prod-logs prod-config dev-up dev-down dev-ps dev-logs dev-config all-up all-down all-ps config ingest-stock ingest-fund ingest-market load-raw load-raw-prod dbt-debug dbt-run dbt-test
 
 COMPOSE ?= docker compose
 PROD_COMPOSE_FILE ?= compose.yml
@@ -11,6 +11,9 @@ UV ?= uv
 INGEST_ARGS ?=
 STOCK_ARGS ?= $(INGEST_ARGS)
 FUND_ARGS ?= $(INGEST_ARGS)
+LOAD_ARGS ?=
+DBT_DIR ?= src/data_pipeline/dbt
+DBT_ARGS ?=
 
 help:
 	@echo "Usage: make <target> [SERVICES=\"service ...\"] [BUILD=--build]"
@@ -40,6 +43,13 @@ help:
 	@echo "  ingest-fund   Fetch fund data and write a raw JSON dump"
 	@echo "  ingest-market Run stock ingestion, then fund ingestion"
 	@echo ""
+	@echo "ELT into the warehouse (load raw -> Bronze, then dbt transforms):"
+	@echo "  load-raw      Load raw JSON into the LOCAL dev Bronze (localhost:5433)"
+	@echo "  load-raw-prod Load raw JSON into the PROD Bronze (inside the dagster-code container)"
+	@echo "  dbt-debug     Check the dbt connection to the warehouse"
+	@echo "  dbt-run       Build dbt models (staging views + marts tables)"
+	@echo "  dbt-test      Run dbt tests"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make prod-up"
 	@echo "  make prod-up SERVICES=\"postgres warehouse-postgres\""
@@ -47,6 +57,9 @@ help:
 	@echo "  make ingest-stock STOCK_ARGS=\"--symbol FPT --start 2026-09-01 --end 2026-09-19\""
 	@echo "  make ingest-fund FUND_ARGS=\"--symbol E1VFVN30 --start 2026-09-01 --end 2026-09-19\""
 	@echo "  make ingest-market STOCK_ARGS=\"--symbol FPT --start 2026-09-01 --end 2026-09-19\" FUND_ARGS=\"--symbol E1VFVN30 --start 2026-09-01 --end 2026-09-19\""
+	@echo "  make load-raw LOAD_ARGS=\"--path storage/raw/vnstock/stock_daily_2026-09-01_2026-09-19.json\""
+	@echo "  make load-raw-prod LOAD_ARGS=\"--path storage/raw/vnstock/stock_daily_2026-09-01_2026-09-19.json\""
+	@echo "  make dbt-run DBT_ARGS=\"--select staging\""
 
 prod-up:
 	$(COMPOSE) -f $(PROD_COMPOSE_FILE) up $(BUILD) $(DETACH) $(SERVICES)
@@ -101,3 +114,18 @@ ingest-fund:
 ingest-market:
 	$(UV) run python scripts/test_stock_source.py $(STOCK_ARGS)
 	$(UV) run python scripts/test_fund_source.py $(FUND_ARGS)
+
+load-raw:
+	$(UV) run python scripts/load_postgres_raw.py $(LOAD_ARGS)
+
+load-raw-prod:
+	$(COMPOSE) -f $(PROD_COMPOSE_FILE) exec dagster-code python scripts/load_postgres_raw.py $(LOAD_ARGS)
+
+dbt-debug:
+	$(UV) run dbt debug --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) $(DBT_ARGS)
+
+dbt-run:
+	$(UV) run dbt run --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) $(DBT_ARGS)
+
+dbt-test:
+	$(UV) run dbt test --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) $(DBT_ARGS)

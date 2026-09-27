@@ -4,7 +4,7 @@ COMPOSE ?= docker compose
 PROD_COMPOSE_FILE ?= compose.yml
 DEV_COMPOSE_FILE ?= compose.dev.yml
 SERVICES ?=
-BUILD ?= --build
+BUILD ?=
 DETACH ?= -d
 LOG_ARGS ?=
 UV ?= uv
@@ -13,7 +13,7 @@ STOCK_ARGS ?= $(INGEST_ARGS)
 FUND_ARGS ?= $(INGEST_ARGS)
 
 help:
-	@echo "Usage: make <target> [SERVICES=\"service ...\"]"
+	@echo "Usage: make <target> [SERVICES=\"service ...\"] [BUILD=--build]"
 	@echo ""
 	@echo "Production-shaped stack from $(PROD_COMPOSE_FILE):"
 	@echo "  prod-up       Start all services, or SERVICES=\"...\" for a partial stack"
@@ -43,7 +43,7 @@ help:
 	@echo "Examples:"
 	@echo "  make prod-up"
 	@echo "  make prod-up SERVICES=\"postgres warehouse-postgres\""
-	@echo "  make all-up BUILD="
+	@echo "  make all-up BUILD=--build"
 	@echo "  make ingest-stock STOCK_ARGS=\"--symbol FPT --start 2026-09-01 --end 2026-09-19\""
 	@echo "  make ingest-fund FUND_ARGS=\"--symbol E1VFVN30 --start 2026-09-01 --end 2026-09-19\""
 	@echo "  make ingest-market STOCK_ARGS=\"--symbol FPT --start 2026-09-01 --end 2026-09-19\" FUND_ARGS=\"--symbol E1VFVN30 --start 2026-09-01 --end 2026-09-19\""
@@ -64,7 +64,7 @@ prod-config:
 	$(COMPOSE) -f $(PROD_COMPOSE_FILE) config
 
 dev-up:
-	$(COMPOSE) -f $(DEV_COMPOSE_FILE) up $(DETACH) $(SERVICES)
+	$(COMPOSE) -f $(DEV_COMPOSE_FILE) up $(BUILD) $(DETACH) $(SERVICES)
 
 dev-down:
 	$(COMPOSE) -f $(DEV_COMPOSE_FILE) down
@@ -80,7 +80,7 @@ dev-config:
 
 all-up:
 	$(COMPOSE) -f $(PROD_COMPOSE_FILE) up $(BUILD) $(DETACH)
-	$(COMPOSE) -f $(DEV_COMPOSE_FILE) up $(DETACH)
+	$(COMPOSE) -f $(DEV_COMPOSE_FILE) up $(BUILD) $(DETACH)
 
 all-down:
 	$(COMPOSE) -f $(DEV_COMPOSE_FILE) down

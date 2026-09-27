@@ -15,8 +15,7 @@ dependencies = [
     "dbt-postgres",
     "httpx==0.28.1",
     "python-dotenv==1.2.3",
-    "pyyaml==6.0.3",
-    "vnstock==4.0.8",
+    "pyyaml==6.0.3"
 ]
 
 [dependency-groups]

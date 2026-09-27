@@ -12,7 +12,7 @@ param(
     [string]$Compose = 'docker compose',
     [string]$ProdComposeFile = 'compose.yml',
     [string]$DevComposeFile = 'compose.dev.yml',
-    [switch]$NoBuild,
+    [switch]$Build,
     [switch]$NoDetach,
     [string[]]$LogArgs = @(),
     [string]$Uv = 'uv',
@@ -93,7 +93,7 @@ function Get-UpArgs {
 }
 
 function Show-Help {
-    Write-Host 'Usage: ./make.ps1 <target> [-Services service ...]'
+    Write-Host 'Usage: ./make.ps1 <target> [-Services service ...] [-Build]'
     Write-Host ''
     Write-Host "Production-shaped stack from ${ProdComposeFile}:"
     Write-Host '  prod-up       Start all services, or -Services ... for a partial stack'
@@ -123,29 +123,29 @@ function Show-Help {
     Write-Host 'Examples:'
     Write-Host '  ./make.ps1 prod-up'
     Write-Host '  ./make.ps1 prod-up -Services postgres,warehouse-postgres'
-    Write-Host '  ./make.ps1 all-up -NoBuild'
+    Write-Host '  ./make.ps1 all-up -Build'
     Write-Host "  ./make.ps1 ingest-stock -StockArgs @('--symbol','FPT','--start','2026-09-01','--end','2026-09-19')"
     Write-Host "  ./make.ps1 ingest-fund -FundArgs @('--symbol','E1VFVN30','--start','2026-09-01','--end','2026-09-19')"
     Write-Host "  ./make.ps1 ingest-market -StockArgs @('--symbol','FPT','--start','2026-09-01','--end','2026-09-19') -FundArgs @('--symbol','E1VFVN30','--start','2026-09-01','--end','2026-09-19')"
 }
 
-$prodBuild = -not $NoBuild
+$buildImages = $Build
 
 switch ($Target) {
     'help' { Show-Help }
-    'prod-up' { Invoke-Compose $ProdComposeFile (Get-UpArgs -IncludeBuild:$prodBuild -SelectedServices $Services) }
+    'prod-up' { Invoke-Compose $ProdComposeFile (Get-UpArgs -IncludeBuild:$buildImages -SelectedServices $Services) }
     'prod-down' { Invoke-Compose $ProdComposeFile @('down') }
     'prod-ps' { Invoke-Compose $ProdComposeFile (@('ps') + $Services) }
     'prod-logs' { Invoke-Compose $ProdComposeFile (@('logs') + $LogArgs + $Services) }
     'prod-config' { Invoke-Compose $ProdComposeFile @('config') }
-    'dev-up' { Invoke-Compose $DevComposeFile (Get-UpArgs -SelectedServices $Services) }
+    'dev-up' { Invoke-Compose $DevComposeFile (Get-UpArgs -IncludeBuild:$buildImages -SelectedServices $Services) }
     'dev-down' { Invoke-Compose $DevComposeFile @('down') }
     'dev-ps' { Invoke-Compose $DevComposeFile (@('ps') + $Services) }
     'dev-logs' { Invoke-Compose $DevComposeFile (@('logs') + $LogArgs + $Services) }
     'dev-config' { Invoke-Compose $DevComposeFile @('config') }
     'all-up' {
-        Invoke-Compose $ProdComposeFile (Get-UpArgs -IncludeBuild:$prodBuild -SelectedServices @())
-        Invoke-Compose $DevComposeFile (Get-UpArgs -SelectedServices @())
+        Invoke-Compose $ProdComposeFile (Get-UpArgs -IncludeBuild:$buildImages -SelectedServices @())
+        Invoke-Compose $DevComposeFile (Get-UpArgs -IncludeBuild:$buildImages -SelectedServices @())
     }
     'all-down' {
         Invoke-Compose $DevComposeFile @('down')

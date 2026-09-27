@@ -123,6 +123,10 @@ def load_extraction_to_postgres(
     connection_factory: ConnectionFactory | None = None,
 ) -> BronzeLoadResult:
     """Persist an extraction as an append-only, idempotent Postgres Bronze batch."""
+    
+    import psycopg2.extras
+    
+    psycopg2.extras.register_uuid()
 
     partition = date.fromisoformat(partition_date)
     records = bronze_records(extraction)

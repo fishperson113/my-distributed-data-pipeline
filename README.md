@@ -138,13 +138,14 @@ make prod-logs LOG_ARGS="-f --tail=100" SERVICES=dagster-webserver
 ```
 
 The PowerShell wrapper has equivalent parameters.
-Use `-NoBuild` to skip the production build step.
+Startup commands do not rebuild images by default.
+Use `BUILD=--build` with Make or `-Build` with PowerShell when images must be rebuilt.
 Use `-NoDetach` to run attached.
 Use `-LogArgs` to pass extra log options.
 Use `-Compose`, `-ProdComposeFile`, and `-DevComposeFile` to override the compose command or compose file paths.
 
 ```powershell
-./make.ps1 prod-up -NoBuild
+./make.ps1 prod-up -Build
 ./make.ps1 prod-up -NoDetach
 ./make.ps1 prod-logs -LogArgs '-f','--tail=100' -Services dagster-webserver
 ```
@@ -191,6 +192,17 @@ make ingest-market STOCK_ARGS="--symbol FPT --start 2026-09-01 --end 2026-09-19"
 ```
 
 The scripts write JSON envelopes under `storage/raw/vnstock/` and `storage/raw/ssi/`. Runtime data in these directories is ignored by Git.
+
+### Load raw envelopes into Postgres Bronze
+
+After the warehouse migrations have been applied and `WAREHOUSE_POSTGRES_DSN` is configured, load a raw JSON file or a designated raw-data directory into the corresponding `bronze` table:
+
+```bash
+uv run python scripts/load_postgres_raw.py --path storage/raw/ssi
+```
+
+Repeat `--path` to load multiple files or directories.
+The script scans directories recursively, derives the partition date from a `date=YYYY-MM-DD` path component or the envelope's `request.end` field, and preserves the raw file path in the Bronze ingestion batch.
 
 Deployment and infrastructure settings are managed in `.env`: database access,
 ports, external endpoint, HTTP timeout/retry policy, telemetry, raw storage path,

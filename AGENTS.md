@@ -29,8 +29,11 @@ It is standalone and not yet wired into Dagster assets, jobs, or schedules.
 - Use `make all-up` or `./make.ps1 all-up` only when both stacks are intentionally needed.
 - For partial startup, pass explicit services with `SERVICES="service ..."` in Make or `-Services service,...` in PowerShell.
 - Examples are `make prod-up SERVICES="postgres warehouse-postgres"` and `./make.ps1 dev-up -Services mongo`.
+- Startup commands do not rebuild images by default; use `BUILD=--build` in Make or `-Build` in PowerShell when a rebuild is required.
 - `ingest-stock` and `ingest-fund` run the standalone source probes; `ingest-market` runs both in sequence.
 - Pass probe arguments through `STOCK_ARGS` and `FUND_ARGS` in Make, or `-StockArgs` and `-FundArgs` in PowerShell.
+- To manually load raw JSON envelopes into PostgreSQL Bronze, run `uv run python scripts/load_postgres_raw.py --path storage/raw/ssi` after configuring `WAREHOUSE_POSTGRES_DSN` and applying warehouse migrations.
+- `--path` accepts a JSON file or recursively scanned directory and can be repeated for multiple locations.
 - Do not add new infrastructure wrapper targets that hide materially different behavior from the underlying Compose files.
 - Prefer documenting any new wrapper option in both `README.md` and this file when the option changes how infrastructure is started, stopped, or validated.
 

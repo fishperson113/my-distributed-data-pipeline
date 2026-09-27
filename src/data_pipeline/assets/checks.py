@@ -69,7 +69,7 @@ def _record_count_matches(table: str, dataset: str) -> dg.AssetCheckResult:
 
 @dg.asset_check(
     asset=bronze_stock_daily,
-    name="no_duplicate_records",
+    name="stock_no_duplicate_records",
     description="Each (batch_id, source_record_key) is unique: re-runs add no rows.",
 )
 def bronze_stock_no_duplicate_records() -> dg.AssetCheckResult:
@@ -78,7 +78,7 @@ def bronze_stock_no_duplicate_records() -> dg.AssetCheckResult:
 
 @dg.asset_check(
     asset=bronze_stock_daily,
-    name="record_count_matches",
+    name="stock_record_count_matches",
     description="Stored rows per batch equal the batch's declared record_count.",
 )
 def bronze_stock_record_count_matches() -> dg.AssetCheckResult:
@@ -87,7 +87,7 @@ def bronze_stock_record_count_matches() -> dg.AssetCheckResult:
 
 @dg.asset_check(
     asset=bronze_fund_daily,
-    name="no_duplicate_records",
+    name="fund_no_duplicate_records",
     description="Each (batch_id, source_record_key) is unique: re-runs add no rows.",
 )
 def bronze_fund_no_duplicate_records() -> dg.AssetCheckResult:
@@ -96,7 +96,7 @@ def bronze_fund_no_duplicate_records() -> dg.AssetCheckResult:
 
 @dg.asset_check(
     asset=bronze_fund_daily,
-    name="record_count_matches",
+    name="fund_record_count_matches",
     description="Stored rows per batch equal the batch's declared record_count.",
 )
 def bronze_fund_record_count_matches() -> dg.AssetCheckResult:

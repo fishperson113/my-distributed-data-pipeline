@@ -1,4 +1,4 @@
-.PHONY: help prod-up prod-down prod-ps prod-logs prod-config dev-up dev-down dev-ps dev-logs dev-config all-up all-down all-ps config ingest-stock ingest-fund ingest-market load-raw load-raw-prod dbt-debug dbt-run dbt-test
+.PHONY: help prod-up prod-down prod-ps prod-logs prod-config dev-up dev-down dev-ps dev-logs dev-config all-up all-down all-ps config ingest-stock ingest-fund ingest-market load-raw load-raw-prod dbt-debug dbt-run dbt-test dbt-debug-prod dbt-run-prod dbt-test-prod
 
 COMPOSE ?= docker compose
 PROD_COMPOSE_FILE ?= compose.yml
@@ -46,9 +46,12 @@ help:
 	@echo "ELT into the warehouse (load raw -> Bronze, then dbt transforms):"
 	@echo "  load-raw      Load raw JSON into the LOCAL dev Bronze (localhost:5433)"
 	@echo "  load-raw-prod Load raw JSON into the PROD Bronze (inside the dagster-code container)"
-	@echo "  dbt-debug     Check the dbt connection to the warehouse"
-	@echo "  dbt-run       Build dbt models (staging views + marts tables)"
-	@echo "  dbt-test      Run dbt tests"
+	@echo "  dbt-debug     Check the dbt connection to the LOCAL dev warehouse (5433)"
+	@echo "  dbt-run       Build dbt models against LOCAL dev (staging views + marts tables)"
+	@echo "  dbt-test      Run dbt tests against LOCAL dev"
+	@echo "  dbt-debug-prod  Check dbt connection inside the prod stack (target=prod)"
+	@echo "  dbt-run-prod    Build dbt models against PROD (inside the dagster-code container)"
+	@echo "  dbt-test-prod   Run dbt tests against PROD (inside the dagster-code container)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make prod-up"
@@ -129,3 +132,12 @@ dbt-run:
 
 dbt-test:
 	$(UV) run dbt test --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) $(DBT_ARGS)
+
+dbt-debug-prod:
+	$(COMPOSE) -f $(PROD_COMPOSE_FILE) exec dagster-code dbt debug --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) --target prod $(DBT_ARGS)
+
+dbt-run-prod:
+	$(COMPOSE) -f $(PROD_COMPOSE_FILE) exec dagster-code dbt run --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) --target prod $(DBT_ARGS)
+
+dbt-test-prod:
+	$(COMPOSE) -f $(PROD_COMPOSE_FILE) exec dagster-code dbt test --project-dir $(DBT_DIR) --profiles-dir $(DBT_DIR) --target prod $(DBT_ARGS)

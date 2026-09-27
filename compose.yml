@@ -15,6 +15,9 @@ x-dagster-environment: &dagster-environment
   RAW_STORAGE_PATH: ${RAW_STORAGE_PATH:-/opt/dagster/app/storage/raw}
   PIPELINE_CONFIG_PATH: ${PIPELINE_CONFIG_PATH:-/opt/dagster/app/config.yml}
   WAREHOUSE_POSTGRES_DSN: postgresql://${WAREHOUSE_POSTGRES_USER:-warehouse}:${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}@warehouse-postgres:5432/${WAREHOUSE_POSTGRES_DB:-warehouse}
+  WAREHOUSE_POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-warehouse}
+  WAREHOUSE_POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}
+  WAREHOUSE_POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-warehouse}
 
 x-dagster-service: &dagster-service
   image: my-distributed-data-pipeline:${IMAGE_TAG:-local}

@@ -15,7 +15,7 @@ with ranked as (
         ) as version_rank
     from {{ source('bronze', 'fund') }} as fund
     inner join bronze.ingestion_batch as batch on fund.batch_id = batch.batch_id
-    where batch.status = 'succeeded'
+    where batch.status = 'completed'
 )
 
 select

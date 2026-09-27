@@ -1,10 +1,19 @@
 stock_etl:
-  target: dev
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
   outputs:
     dev:
       type: postgres
       host: "{{ env_var('WAREHOUSE_POSTGRES_HOST', 'localhost') }}"
       port: "{{ env_var('WAREHOUSE_POSTGRES_PORT', '5433') | int }}"
+      user: "{{ env_var('WAREHOUSE_POSTGRES_USER', 'warehouse') }}"
+      pass: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB', 'warehouse') }}"
+      schema: public
+      threads: 4
+    prod:
+      type: postgres
+      host: warehouse-postgres
+      port: 5432
       user: "{{ env_var('WAREHOUSE_POSTGRES_USER', 'warehouse') }}"
       pass: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD') }}"
       dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB', 'warehouse') }}"

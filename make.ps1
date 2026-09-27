@@ -5,7 +5,8 @@ param(
         'dev-up', 'dev-down', 'dev-ps', 'dev-logs', 'dev-config',
         'all-up', 'all-down', 'all-ps', 'config',
         'ingest-stock', 'ingest-fund', 'ingest-market',
-        'load-raw', 'load-raw-prod', 'dbt-debug', 'dbt-run', 'dbt-test'
+        'load-raw', 'load-raw-prod', 'dbt-debug', 'dbt-run', 'dbt-test',
+        'dbt-debug-prod', 'dbt-run-prod', 'dbt-test-prod'
     )]
     [string]$Target = 'help',
 
@@ -142,9 +143,12 @@ function Show-Help {
     Write-Host 'ELT into the warehouse (load raw -> Bronze, then dbt transforms):'
     Write-Host '  load-raw      Load raw JSON into the LOCAL dev Bronze (localhost:5433)'
     Write-Host '  load-raw-prod Load raw JSON into the PROD Bronze (inside the dagster-code container)'
-    Write-Host '  dbt-debug     Check the dbt connection to the warehouse'
-    Write-Host '  dbt-run       Build dbt models (staging views + marts tables)'
-    Write-Host '  dbt-test      Run dbt tests'
+    Write-Host '  dbt-debug     Check the dbt connection to the LOCAL dev warehouse (5433)'
+    Write-Host '  dbt-run       Build dbt models against LOCAL dev (staging views + marts tables)'
+    Write-Host '  dbt-test      Run dbt tests against LOCAL dev'
+    Write-Host '  dbt-debug-prod  Check dbt connection inside the prod stack (target=prod)'
+    Write-Host '  dbt-run-prod    Build dbt models against PROD (inside the dagster-code container)'
+    Write-Host '  dbt-test-prod   Run dbt tests against PROD (inside the dagster-code container)'
     Write-Host ''
     Write-Host 'Examples:'
     Write-Host '  ./make.ps1 prod-up'
@@ -207,4 +211,7 @@ switch ($Target) {
     'dbt-debug' { Invoke-Dbt -Command 'debug' -Arguments $DbtArgs }
     'dbt-run' { Invoke-Dbt -Command 'run' -Arguments $DbtArgs }
     'dbt-test' { Invoke-Dbt -Command 'test' -Arguments $DbtArgs }
+    'dbt-debug-prod' { Invoke-Compose $ProdComposeFile (@('exec', 'dagster-code', 'dbt', 'debug', '--project-dir', $DbtDir, '--profiles-dir', $DbtDir, '--target', 'prod') + $DbtArgs) }
+    'dbt-run-prod' { Invoke-Compose $ProdComposeFile (@('exec', 'dagster-code', 'dbt', 'run', '--project-dir', $DbtDir, '--profiles-dir', $DbtDir, '--target', 'prod') + $DbtArgs) }
+    'dbt-test-prod' { Invoke-Compose $ProdComposeFile (@('exec', 'dagster-code', 'dbt', 'test', '--project-dir', $DbtDir, '--profiles-dir', $DbtDir, '--target', 'prod') + $DbtArgs) }
 }

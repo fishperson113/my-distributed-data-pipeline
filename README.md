@@ -21,6 +21,12 @@ filesystem landing step. dbt transforms directly from Postgres Bronze into
 Postgres staging and marts. Mongo remains an optional compatibility utility,
 outside the production pipeline.
 
+Ingestion is intraday. A partition is still one trading day, but each partition
+crawls every bar inside the session at the width set in `config.yml`. The asset
+keys and Bronze dataset names keep their `daily` wording because they name the
+partition and the source feed, not the bar width. See
+[Intraday ingestion](#intraday-ingestion) for the retention limits this implies.
+
 ## Local setup
 
 ```bash
@@ -203,6 +209,124 @@ uv run python scripts/load_postgres_raw.py --path storage/raw/ssi
 
 Repeat `--path` to load multiple files or directories.
 The script scans directories recursively, derives the partition date from a `date=YYYY-MM-DD` path component or the envelope's `request.end` field, and preserves the raw file path in the Bronze ingestion batch.
+
+## Intraday ingestion
+
+`bronze/stock_daily` and `bronze/fund_daily` crawl every bar inside a partition
+day and land them in `bronze.stock` and `bronze.fund`. No table or column was
+added for this: the Bronze schema is unchanged, and only the meaning of
+`source_record_key` and the shape of the JSONB payload moved. The key is now
+`symbol|ts_epoch`, so a re-run is idempotent per bar and a provider revising a
+value collides with the bar it revises.
+
+Bar width is set once in `config.yml` under `ingestion.intraday`:
+
+```yaml
+ingestion:
+  intraday:
+    granularity_minutes: 15
+    retention_days: 30
+```
+
+Only 1, 5, 15, 30 and 60 are accepted. That is the intersection of what the two
+sources serve, and the allow-list matters: SSI answers an unrecognised
+`resolution` with HTTP 200 and daily candles rather than an error, so an
+unchecked typo would silently change the grain. The adapter verifies the grain
+of what came back as well, and rejects a response whose bars all sit at midnight.
+
+### Retention
+
+Intraday history is a rolling window, far shorter than the daily history:
+
+| Source | Daily grain reaches back to | Intraday grain reaches back to |
+| --- | --- | --- |
+| SSI iBoard | 2014 | about 31 days |
+| vnstock `kbs` | 2020 | about 6 weeks |
+| vnstock `vci` | 2018 | about 6 months |
+
+A request that starts before the window returns an empty but successful payload,
+which is indistinguishable from a public holiday. `retention_days` turns that
+into a loud `IntradayRetentionError` so an expired partition fails instead of
+landing an empty Bronze batch.
+
+This is the main operational consequence of running a single intraday grain:
+partitions older than the window can no longer be backfilled at all.
+`partitions.daily_market.start_date` in `config.yml` is still `2020-01-01`, so
+Dagster will offer years of partitions that every source has dropped. Move that
+date forward if the empty range is a nuisance.
+
+### Crawling part of a session
+
+Both assets accept an optional exchange-local window. Leaving it unset crawls
+the whole day, which is what the schedule does:
+
+```yaml
+ops:
+  bronze__stock_daily:
+    config:
+      start_time: "13:00"
+      end_time: "14:00"
+  bronze__fund_daily:
+    config:
+      start_time: "13:00"
+      end_time: "14:00"
+```
+
+The same window is available from the standalone probes:
+
+```bash
+uv run python scripts/test_stock_source.py --date 2026-09-25 --start-time 13:00 --end-time 14:00
+uv run python scripts/test_fund_source.py --date 2026-09-25 --granularity 5
+```
+
+SSI applies the window in the request itself. vnstock only accepts plain
+`YYYY-MM-DD` bounds -- passing a clock component raises `Dữ liệu trống` -- so the
+whole day is fetched and the window is applied on the normalised timestamps.
+
+### Bar counts are not uniform
+
+A source only emits a bar for an interval that actually traded, so bar counts
+differ between symbols on the same day. On 2026-09-25 at one-minute bars, FPT
+returned 225 and E1VFVN30 returned 140. Nothing asserts a fixed bar count per
+day, and a consumer should not either.
+
+### Clearing a warehouse that predates the conversion
+
+Ingestion used to land one bar per trading day. A warehouse that already holds
+those rows keeps them, because the conversion shipped without a migration. The
+staging models cannot type them -- a payload with no `ts_epoch` yields a null
+`bar_ts` -- so a single legacy row fails the `not_null` tests and blocks the
+whole dbt build. Clear them once, after deploying:
+
+```bash
+# Dry run first: reports what it would delete and touches nothing.
+docker compose run --rm warehouse-migrations python scripts/clear_legacy_bronze.py
+docker compose run --rm warehouse-migrations python scripts/clear_legacy_bronze.py --apply
+```
+
+The script identifies a legacy row by the absence of `ts_epoch`, not by its age,
+so re-running it on a clean warehouse is a no-op. It deletes the rows first and
+then the batches left holding nothing, which is the order the foreign keys
+require. Re-run `dbt build` afterwards so staging and marts reflect the result.
+
+To drop everything instead and start over from intraday, remove the warehouse
+volume rather than deleting rows:
+
+```bash
+docker compose down
+docker volume rm my-distributed-data-pipeline_warehouse-postgres-data
+docker compose up -d   # warehouse-migrations recreates the bronze schema
+```
+
+## Intraday marts
+
+`marts.exp_vn30_vs_fund_daily` compares each stock against the fund on a
+shared grid. Because the two sides do not print the same bars, an inner join on
+the instant would drop rows. Instead every grid bucket seen on either side forms
+a spine, both sides are left joined onto it, and the last known close is carried
+forward within the trading day. `stock_is_actual` and `fund_is_actual` mark
+whether a close was observed or carried, so a filled value is never mistaken for
+a print. `bucket_time` and `bucket_ts_local` render in exchange-local time.
 
 Deployment and infrastructure settings are managed in `.env`: database access,
 ports, external endpoint, HTTP timeout/retry policy, telemetry, raw storage path,

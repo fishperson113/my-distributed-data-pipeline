@@ -1,7 +1,18 @@
+-- Typed, one-row-per-bar view over the vnstock Bronze raw table.
+--
+-- The grain is intraday: one row per (symbol, instant) at the bar width set in
+-- config.yml. The model keeps its `daily` name because a partition is still one
+-- trading day.
+--
+-- Bronze is append-only: a revised payload for a partition creates a new batch
+-- rather than overwriting the old one, so the newest batch wins per instant.
 with ranked as (
     select
         stock.payload ->> 'symbol' as symbol,
-        cast(stock.payload ->> 'time' as timestamptz)::date as trade_date,
+        to_timestamp((stock.payload ->> 'ts_epoch')::bigint) as bar_ts,
+        (stock.payload ->> 'ts_epoch')::bigint as ts_epoch,
+        cast(stock.payload ->> 'trade_date' as date) as trade_date,
+        cast(stock.payload ->> 'granularity_minutes' as integer) as granularity_minutes,
         cast(stock.payload ->> 'open' as double precision) as open,
         cast(stock.payload ->> 'high' as double precision) as high,
         cast(stock.payload ->> 'low' as double precision) as low,
@@ -10,7 +21,7 @@ with ranked as (
         batch.provider_name as provider,
         batch.finished_at as fetched_at,
         row_number() over (
-            partition by stock.payload ->> 'symbol', cast(stock.payload ->> 'time' as timestamptz)::date
+            partition by stock.payload ->> 'symbol', (stock.payload ->> 'ts_epoch')::bigint
             order by batch.finished_at desc nulls last, batch.started_at desc
         ) as version_rank
     from {{ source('bronze', 'stock') }} as stock
@@ -20,7 +31,10 @@ with ranked as (
 
 select
     symbol,
+    bar_ts,
+    ts_epoch,
     trade_date,
+    granularity_minutes,
     open,
     high,
     low,

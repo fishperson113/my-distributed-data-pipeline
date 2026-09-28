@@ -7,10 +7,24 @@ ingestion:
       - HPG
   fund:
     symbol: E1VFVN30
+  intraday:
+    # Bar width in minutes. Only 1, 5, 15, 30 and 60 are accepted: that is the
+    # intersection of what SSI and vnstock both serve. Anything else makes SSI
+    # silently fall back to daily bars, so the value is validated up front.
+    granularity_minutes: 15
+    # Both sources only retain intraday history for a rolling window. Partitions
+    # older than this fail loudly instead of landing an empty batch.
+    retention_days: 30
 
 partitions:
   daily_market:
-    start_date: "2020-01-01"
+    # Intraday history is a rolling window of roughly 31 days, so a start_date
+    # far in the past would list years of partitions no source can satisfy.
+    # This was the oldest bar SSI still served when it was measured on
+    # 2026-09-28. The window keeps moving, so partitions behind it gradually
+    # expire and fail with IntradayRetentionError; advance this date when the
+    # dead range gets noisy.
+    start_date: "2026-09-03"
     timezone: Asia/Ho_Chi_Minh
 
 schedules:

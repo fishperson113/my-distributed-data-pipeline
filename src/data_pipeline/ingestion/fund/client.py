@@ -1,4 +1,9 @@
-"""Standalone-compatible SSI iBoard history client."""
+"""Standalone-compatible SSI iBoard intraday history client.
+
+The Bronze dataset name stays `fund_daily`: it identifies the source feed, not
+the bar width, and the Bronze CHECK constraint pins the accepted values. The
+grain it now carries is intraday, at the width set in `config.yml`.
+"""
 
 from __future__ import annotations
 
@@ -8,27 +13,28 @@ from typing import Any
 
 import httpx
 
+from data_pipeline.ingestion.common.errors import (
+    IntradayGrainError,
+    IntradayRetentionError,
+    SourceResponseError,
+)
 from data_pipeline.ingestion.common.models import RawExtraction
+from data_pipeline.ingestion.common.timeframe import (
+    MARKET_TIMEZONE,
+    bar_timestamp_fields,
+    from_epoch,
+    is_outside_retention,
+    resolve_window,
+    to_epoch,
+    within_window,
+)
 
 DEFAULT_SSI_HISTORY_URL = "https://iboard-api.ssi.com.vn/statistics/charts/history"
 RETRIABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
-
-class SourceResponseError(RuntimeError):
-    """Raised when the upstream response cannot form a trustworthy raw extract."""
-
-
-def _unix_range(start: str, end: str) -> tuple[int, int]:
-    """Convert inclusive ISO dates to the SSI Unix-second request range."""
-
-    start_date = date.fromisoformat(start)
-    end_date = date.fromisoformat(end)
-    if end_date < start_date:
-        raise ValueError("The end date must be on or after the start date.")
-
-    start_at = datetime.combine(start_date, datetime_time.min, tzinfo=UTC)
-    end_exclusive = datetime.combine(end_date + timedelta(days=1), datetime_time.min, tzinfo=UTC)
-    return int(start_at.timestamp()), int(end_exclusive.timestamp())
+# Names the source feed, not the bar width. Pinned by the Bronze CHECK
+# constraint, so it stays put while the grain underneath it changed.
+FUND_DATASET = "fund_daily"
 
 
 def _request_payload(
@@ -61,8 +67,8 @@ def _request_payload(
     raise SourceResponseError(f"SSI request failed after {max_attempts} attempts: {last_error}")
 
 
-def _daily_records(payload: dict[str, Any], symbol: str) -> list[dict[str, Any]]:
-    """Convert SSI parallel OHLCV arrays into lossless logical candle records."""
+def _ohlcv_arrays(payload: dict[str, Any]) -> dict[str, list[Any]]:
+    """Validate the SSI envelope and return its parallel OHLCV arrays."""
 
     if str(payload.get("code", "")).upper() != "SUCCESS":
         raise SourceResponseError(f"SSI returned a non-success code: {payload.get('code')!r}")
@@ -71,9 +77,8 @@ def _daily_records(payload: dict[str, Any], symbol: str) -> list[dict[str, Any]]
     if not isinstance(data, dict):
         raise SourceResponseError("SSI response is missing the data object.")
 
-    required_fields = ("t", "o", "h", "l", "c", "v")
     arrays: dict[str, list[Any]] = {}
-    for field in required_fields:
+    for field in ("t", "o", "h", "l", "c", "v"):
         value = data.get(field)
         if not isinstance(value, list):
             raise SourceResponseError(f"SSI data field {field!r} is not an array.")
@@ -82,47 +87,69 @@ def _daily_records(payload: dict[str, Any], symbol: str) -> list[dict[str, Any]]
     lengths = {field: len(values) for field, values in arrays.items()}
     if len(set(lengths.values())) != 1:
         raise SourceResponseError(f"SSI OHLCV arrays have different lengths: {lengths}")
+    return arrays
 
-    records: list[dict[str, Any]] = []
-    for index in range(lengths["t"]):
-        timestamp = int(arrays["t"][index])
-        records.append(
-            {
-                "symbol": symbol,
-                "timestamp": timestamp,
-                "trade_date": datetime.fromtimestamp(timestamp, tz=UTC).date().isoformat(),
-                "open": arrays["o"][index],
-                "high": arrays["h"][index],
-                "low": arrays["l"][index],
-                "close": arrays["c"][index],
-                "volume": arrays["v"][index],
-            }
+
+def _assert_intraday_grain(epochs: list[int]) -> None:
+    """Reject a daily-grain answer to an intraday request.
+
+    SSI serves daily candles, stamped at midnight UTC, for any `resolution` it
+    does not recognise -- and still reports SUCCESS. Every intraday bar carries
+    a real session clock, so an all-midnight response means the grain silently
+    degraded.
+    """
+
+    if not epochs:
+        return
+    if all(
+        datetime.fromtimestamp(epoch, tz=UTC).time() == datetime_time.min for epoch in epochs
+    ):
+        raise IntradayGrainError(
+            "SSI answered an intraday request with daily bars; the resolution was "
+            "likely rejected and silently downgraded."
         )
-    return records
 
 
-def extract_fund_daily(
+def extract_fund_intraday(
     *,
     symbol: str,
-    start: str,
-    end: str,
+    partition_date: str,
+    granularity_minutes: int,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    retention_days: int | None = None,
+    timezone_name: str = MARKET_TIMEZONE,
     timeout_seconds: float = 30.0,
     max_attempts: int = 3,
     endpoint_url: str = DEFAULT_SSI_HISTORY_URL,
     client: httpx.Client | None = None,
 ) -> RawExtraction:
-    """Fetch daily ETF/fund OHLCV data from the SSI public-facing endpoint."""
+    """Fetch intraday ETF/fund bars for one partition day from SSI iBoard.
+
+    SSI takes `from`/`to` as Unix seconds, so a sub-day window is expressed
+    directly in the request rather than filtered afterwards.
+    """
 
     normalized_symbol = symbol.strip().upper()
     if not normalized_symbol:
         raise ValueError("The fund symbol cannot be blank.")
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1.")
+    if granularity_minutes < 1:
+        raise ValueError("granularity_minutes must be at least 1.")
 
-    from_timestamp, to_timestamp = _unix_range(start, end)
+    window_start, window_end = resolve_window(
+        partition_date=partition_date,
+        start_time=start_time,
+        end_time=end_time,
+        timezone_name=timezone_name,
+    )
+    from_timestamp = to_epoch(window_start)
+    to_timestamp = to_epoch(window_end)
+
     params = {
         "symbol": normalized_symbol,
-        "resolution": "D",
+        "resolution": str(granularity_minutes),
         "from": from_timestamp,
         "to": to_timestamp,
     }
@@ -134,7 +161,9 @@ def extract_fund_daily(
     }
 
     owns_client = client is None
-    runtime_client = client or httpx.Client(timeout=timeout_seconds, headers=headers, follow_redirects=True)
+    runtime_client = client or httpx.Client(
+        timeout=timeout_seconds, headers=headers, follow_redirects=True
+    )
     try:
         payload = _request_payload(
             runtime_client,
@@ -146,17 +175,49 @@ def extract_fund_daily(
         if owns_client:
             runtime_client.close()
 
-    records = _daily_records(payload, normalized_symbol)
+    arrays = _ohlcv_arrays(payload)
+    epochs = [int(value) for value in arrays["t"]]
+    _assert_intraday_grain(epochs)
+
+    records: list[dict[str, Any]] = []
+    for index, epoch in enumerate(epochs):
+        moment = from_epoch(epoch, timezone_name)
+        if not within_window(moment, window_start, window_end):
+            continue
+        records.append(
+            {
+                "symbol": normalized_symbol,
+                **bar_timestamp_fields(moment),
+                "granularity_minutes": granularity_minutes,
+                "open": arrays["o"][index],
+                "high": arrays["h"][index],
+                "low": arrays["l"][index],
+                "close": arrays["c"][index],
+                "volume": arrays["v"][index],
+            }
+        )
+
+    if not records and retention_days is not None:
+        if is_outside_retention(window_start=window_start, retention_days=retention_days):
+            raise IntradayRetentionError(
+                f"SSI returned no intraday bars for {partition_date}, which is older than "
+                f"the {retention_days}-day retention window. The source no longer keeps "
+                "this partition; it is not an empty trading day."
+            )
+
     return RawExtraction(
         source="ssi_iboard",
-        dataset="fund_daily",
+        dataset=FUND_DATASET,
         provider="SSI",
         request={
             "url": endpoint_url,
             "symbol": normalized_symbol,
-            "start": start,
-            "end": end,
-            "resolution": "D",
+            "partition_date": partition_date,
+            "start_time": start_time,
+            "end_time": end_time,
+            "granularity_minutes": granularity_minutes,
+            "resolution": str(granularity_minutes),
+            "timezone": timezone_name,
             "from": from_timestamp,
             "to": to_timestamp,
         },

@@ -1,9 +1,9 @@
--- Idempotency after transform: staging must hold one row per (symbol, trade_date).
+-- Idempotency after transform: staging must hold one row per (symbol, instant).
 -- Fails (returns rows) if de-duplication by version_rank ever leaks duplicates.
 select
     symbol,
-    trade_date,
+    ts_epoch,
     count(*) as row_count
 from {{ ref('stg_ssi__fund_daily') }}
-group by symbol, trade_date
+group by symbol, ts_epoch
 having count(*) > 1

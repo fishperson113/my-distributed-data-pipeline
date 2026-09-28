@@ -68,6 +68,23 @@ def _record_checksum(payload: dict[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _bar_record_key(payload: dict[str, Any], dataset: str) -> str:
+    """Build the (symbol, instant) natural key that identifies one bar.
+
+    Keying on the bar's instant rather than a payload hash is what makes a
+    re-run idempotent per bar: a provider revising a value for an instant
+    already stored collides with it instead of landing a second row.
+    """
+
+    symbol = payload.get("symbol")
+    ts_epoch = payload.get("ts_epoch")
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise ValueError(f"{dataset} records must carry a non-empty 'symbol'.")
+    if not isinstance(ts_epoch, int) or isinstance(ts_epoch, bool):
+        raise ValueError(f"{dataset} records must carry an integer 'ts_epoch'.")
+    return f"{symbol.strip().upper()}|{ts_epoch}"
+
+
 def bronze_records(extraction: RawExtraction) -> list[BronzeRecord]:
     """Validate an extraction and map each source record to a Bronze natural key."""
 
@@ -78,12 +95,11 @@ def bronze_records(extraction: RawExtraction) -> list[BronzeRecord]:
     for payload in extraction.records:
         if not isinstance(payload, dict):
             raise ValueError(f"{extraction.dataset} records must be JSON objects.")
-        checksum = _record_checksum(payload)
         records.append(
             BronzeRecord(
-                source_record_key=checksum,
+                source_record_key=_bar_record_key(payload, extraction.dataset),
                 payload=payload,
-                payload_checksum=checksum,
+                payload_checksum=_record_checksum(payload),
             )
         )
     return records

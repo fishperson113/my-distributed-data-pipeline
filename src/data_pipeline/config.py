@@ -63,6 +63,32 @@ class FundPolicy:
     symbol: str
 
 
+# The intersection of what both sources serve. SSI answers an unsupported
+# `resolution` with daily bars and an HTTP 200, so the allow-list is the only
+# thing standing between a typo and a silently wrong grain.
+SUPPORTED_GRANULARITY_MINUTES = frozenset({1, 5, 15, 30, 60})
+
+
+@dataclass(frozen=True)
+class IntradayPolicy:
+    """Bar width and retention window shared by both intraday sources."""
+
+    granularity_minutes: int
+    retention_days: int
+
+    @property
+    def vnstock_interval(self) -> str:
+        """Render the bar width as the vnstock `interval` token."""
+
+        return f"{self.granularity_minutes}m"
+
+    @property
+    def ssi_resolution(self) -> str:
+        """Render the bar width as the SSI `resolution` token."""
+
+        return str(self.granularity_minutes)
+
+
 @dataclass(frozen=True)
 class DailyPartitionPolicy:
     start_date: str
@@ -82,6 +108,7 @@ class PipelineConfig:
 
     stock: StockPolicy
     fund: FundPolicy
+    intraday: IntradayPolicy
     daily_partition: DailyPartitionPolicy
     daily_schedule: DailySchedulePolicy
 
@@ -113,6 +140,7 @@ def load_pipeline_config(path: str | Path | None = None) -> PipelineConfig:
     ingestion = _mapping(root.get("ingestion"), "ingestion")
     stock = _mapping(ingestion.get("stock"), "ingestion.stock")
     fund = _mapping(ingestion.get("fund"), "ingestion.fund")
+    intraday = _mapping(ingestion.get("intraday"), "ingestion.intraday")
     partitions = _mapping(root.get("partitions"), "partitions")
     daily_partition = _mapping(partitions.get("daily_market"), "partitions.daily_market")
     schedules = _mapping(root.get("schedules"), "schedules")
@@ -137,6 +165,25 @@ def load_pipeline_config(path: str | Path | None = None) -> PipelineConfig:
         raise ValueError("ingestion.stock.symbols must contain at least one symbol.")
 
     fund_symbol = _required_text(fund, "symbol", "ingestion.fund").upper()
+
+    granularity = intraday.get("granularity_minutes")
+    if (
+        not isinstance(granularity, int)
+        or isinstance(granularity, bool)
+        or granularity not in SUPPORTED_GRANULARITY_MINUTES
+    ):
+        supported = ", ".join(str(value) for value in sorted(SUPPORTED_GRANULARITY_MINUTES))
+        raise ValueError(
+            f"ingestion.intraday.granularity_minutes must be one of {supported}."
+        )
+    retention_days = intraday.get("retention_days")
+    if (
+        not isinstance(retention_days, int)
+        or isinstance(retention_days, bool)
+        or retention_days < 1
+    ):
+        raise ValueError("ingestion.intraday.retention_days must be a positive integer.")
+
     start_date = _required_text(daily_partition, "start_date", "partitions.daily_market")
     date.fromisoformat(start_date)
     timezone = _required_text(daily_partition, "timezone", "partitions.daily_market")
@@ -156,6 +203,10 @@ def load_pipeline_config(path: str | Path | None = None) -> PipelineConfig:
     return PipelineConfig(
         stock=StockPolicy(provider=provider, symbols=symbols),
         fund=FundPolicy(symbol=fund_symbol),
+        intraday=IntradayPolicy(
+            granularity_minutes=granularity,
+            retention_days=retention_days,
+        ),
         daily_partition=DailyPartitionPolicy(start_date=start_date, timezone=timezone),
         daily_schedule=DailySchedulePolicy(
             hour=hour,

@@ -55,3 +55,12 @@ def test_healthcheck_asset_materializes_locally() -> None:
 
     result = dg.materialize([deployment_healthcheck])
     assert result.success
+
+
+def test_bronze_assets_carry_the_intraday_window_config() -> None:
+    """The sub-day window must be reachable from a manual materialization."""
+
+    graph = defs.resolve_asset_graph()
+    for key in (["bronze", "stock_daily"], ["bronze", "fund_daily"]):
+        spec = graph.get(dg.AssetKey(key))
+        assert spec.partitions_def is not None

@@ -8,6 +8,13 @@ Dagster UI:
   extraction again adds no rows.
 - ``record_count_matches`` proves each load is atomic and complete: the rows
   actually stored equal the ``record_count`` recorded on the batch.
+- ``one_row_per_instant`` proves the natural key really is the bar's instant:
+  within a batch, no (symbol, ts_epoch) pair appears twice.
+
+Bar counts deliberately go unchecked. The sources only emit a bar for an
+interval that actually traded, so a thin symbol legitimately reports fewer bars
+than a liquid one on the same day -- E1VFVN30 returned 140 one-minute bars on a
+day FPT returned 225.
 """
 
 from __future__ import annotations
@@ -67,6 +74,27 @@ def _record_count_matches(table: str, dataset: str) -> dg.AssetCheckResult:
     )
 
 
+def _one_row_per_instant(table: str) -> dg.AssetCheckResult:
+    """Prove the (symbol, instant) key holds: no batch stores an instant twice."""
+
+    duplicate_instants = _scalar(
+        f"""
+        SELECT count(*) FROM (
+            SELECT batch_id,
+                   payload ->> 'symbol' AS symbol,
+                   payload ->> 'ts_epoch' AS ts_epoch
+            FROM bronze.{table}
+            GROUP BY batch_id, payload ->> 'symbol', payload ->> 'ts_epoch'
+            HAVING count(*) > 1
+        ) AS duplicates
+        """
+    )
+    return dg.AssetCheckResult(
+        passed=duplicate_instants == 0,
+        metadata={"duplicate_instant_groups": duplicate_instants},
+    )
+
+
 @dg.asset_check(
     asset=bronze_stock_daily,
     name="stock_no_duplicate_records",
@@ -83,6 +111,15 @@ def bronze_stock_no_duplicate_records() -> dg.AssetCheckResult:
 )
 def bronze_stock_record_count_matches() -> dg.AssetCheckResult:
     return _record_count_matches("stock", "stock_daily")
+
+
+@dg.asset_check(
+    asset=bronze_stock_daily,
+    name="stock_one_row_per_instant",
+    description="No (symbol, ts_epoch) pair is stored twice inside a batch.",
+)
+def bronze_stock_one_row_per_instant() -> dg.AssetCheckResult:
+    return _one_row_per_instant("stock")
 
 
 @dg.asset_check(
@@ -103,9 +140,20 @@ def bronze_fund_record_count_matches() -> dg.AssetCheckResult:
     return _record_count_matches("fund", "fund_daily")
 
 
+@dg.asset_check(
+    asset=bronze_fund_daily,
+    name="fund_one_row_per_instant",
+    description="No (symbol, ts_epoch) pair is stored twice inside a batch.",
+)
+def bronze_fund_one_row_per_instant() -> dg.AssetCheckResult:
+    return _one_row_per_instant("fund")
+
+
 bronze_asset_checks = [
     bronze_stock_no_duplicate_records,
     bronze_stock_record_count_matches,
+    bronze_stock_one_row_per_instant,
     bronze_fund_no_duplicate_records,
     bronze_fund_record_count_matches,
+    bronze_fund_one_row_per_instant,
 ]

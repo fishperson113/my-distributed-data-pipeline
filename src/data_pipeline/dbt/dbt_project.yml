@@ -4,6 +4,11 @@ config-version: 2
 profile: "stock_etl"
 
 model-paths: ["models"]
+
+vars:
+  # Exchange timezone used to render intraday buckets in local clock terms.
+  # Mirrors partitions.daily_market.timezone in config.yml.
+  market_timezone: "Asia/Ho_Chi_Minh"
 clean-targets: ["target", "dbt_packages"]
 
 models:

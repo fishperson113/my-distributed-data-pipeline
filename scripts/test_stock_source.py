@@ -1,4 +1,4 @@
-"""Fetch raw daily stock rows from vnstock without running Dagster."""
+"""Fetch raw intraday stock bars from vnstock without running Dagster."""
 
 from __future__ import annotations
 
@@ -8,12 +8,13 @@ from pathlib import Path
 
 from data_pipeline.config import InfrastructureSettings, PipelineConfig, load_pipeline_config
 from data_pipeline.ingestion.common.raw_output import write_raw_extraction
-from data_pipeline.ingestion.stock import extract_stock_daily
+from data_pipeline.ingestion.stock import extract_stock_intraday
 
 
-def _default_dates() -> tuple[str, str]:
-    end = date.today()
-    return (end - timedelta(days=30)).isoformat(), end.isoformat()
+def _default_date() -> str:
+    """Probe the previous day, which is the partition the schedule crawls."""
+
+    return (date.today() - timedelta(days=1)).isoformat()
 
 
 def build_parser(
@@ -21,11 +22,17 @@ def build_parser(
 ) -> argparse.ArgumentParser:
     """Build the stock source-test CLI parser."""
 
-    default_start, default_end = _default_dates()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbol", action="append", dest="symbols", default=[])
-    parser.add_argument("--start", default=default_start)
-    parser.add_argument("--end", default=default_end)
+    parser.add_argument("--date", default=_default_date(), help="Partition day, YYYY-MM-DD.")
+    parser.add_argument("--start-time", default=None, help="Exchange-local clock, e.g. 13:00.")
+    parser.add_argument("--end-time", default=None, help="Exchange-local clock, e.g. 14:00.")
+    parser.add_argument(
+        "--granularity",
+        type=int,
+        default=policy.intraday.granularity_minutes,
+        choices=(1, 5, 15, 30, 60),
+    )
     parser.add_argument(
         "--provider", default=policy.stock.provider, choices=("kbs", "vci")
     )
@@ -40,14 +47,18 @@ def main() -> int:
     policy = load_pipeline_config()
     args = build_parser(infrastructure, policy).parse_args()
     symbols = args.symbols or list(policy.stock.symbols)
-    extraction = extract_stock_daily(
+    extraction = extract_stock_intraday(
         symbols=symbols,
-        start=args.start,
-        end=args.end,
+        partition_date=args.date,
+        granularity_minutes=args.granularity,
         provider=args.provider,
+        start_time=args.start_time,
+        end_time=args.end_time,
+        retention_days=policy.intraday.retention_days,
+        timezone_name=policy.daily_partition.timezone,
     )
     output = args.output or infrastructure.raw_storage_path / Path(
-        f"vnstock/stock_daily_{args.start}_{args.end}.json"
+        f"vnstock/stock_{args.granularity}m_{args.date}.json"
     )
     write_raw_extraction(extraction, output)
     print(f"stock crawl succeeded: records={extraction.record_count} output={output}")

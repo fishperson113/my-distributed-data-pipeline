@@ -9,13 +9,31 @@ Do not implement stock ingestion, fund ingestion, Bronze migrations, or dbt unle
 A local-only ELT flow (dbt, DuckDB, MongoDB, a separate warehouse Postgres) was added as an explicit scope expansion; see `artifacts/devlog/module-4-bronze-design-supersession.md` and `docs/local-elt.md`.
 It is standalone and not yet wired into Dagster assets, jobs, or schedules.
 
+Ingestion was converted to an intraday grain as an explicit scope expansion. There is one grain, not two: a partition is still one trading day and crawls every bar inside it.
+
 ## Architecture
 
 - `data_pipeline.definitions:defs` is the canonical Dagster code-location entry point.
+- A partition is one trading day and carries every intraday bar of that day.
+- Do not convert the partition definition to an hourly or minute grain. Intraday history is retained for roughly a month, so finer partitions would generate mostly unsatisfiable partitions.
+- The Bronze schema is the one created by `001_create_bronze_raw_landing.sql`. The intraday conversion added no table and no column; it changed only the natural key and the JSONB payload shape.
+- Asset keys, Bronze `dataset_name` values and dbt model names keep their `daily` wording. They name the partition and the source feed, not the bar width, and `dataset_name` is additionally pinned by a Bronze CHECK constraint. Renaming any of them requires a migration.
+- A warehouse that predates the intraday conversion holds daily-shaped rows that the staging models cannot type. Clear them with `scripts/clear_legacy_bronze.py` (dry run by default, `--apply` to delete) before running dbt against it.
+- `source_record_key` is `symbol|ts_epoch`. Do not revert it to a payload checksum: a revised bar would then land beside the bar it revises instead of colliding with it.
 - Dagster assets should be thin orchestration wrappers.
 - Future ingestion modules must remain testable without importing Dagster.
 - Dagster metadata and future pipeline data must not share a database schema.
 - Secrets belong in environment variables and must not be committed.
+
+## Intraday sources
+
+- `ingestion.intraday.granularity_minutes` in `config.yml` accepts only 1, 5, 15, 30 and 60, the intersection of what both sources serve.
+- SSI answers an unrecognised `resolution` with HTTP 200 and daily candles. Never widen that allow-list without verifying the returned grain.
+- vnstock `ohlcv` defaults `count` to 100 and returns the last `count` bars, silently dropping the head of a range. Every intraday call must pass `count` explicitly.
+- vnstock rejects a clock component in `start`/`end`; SSI takes `from`/`to` as Unix seconds and honours a sub-day window directly.
+- SSI returns a UTC epoch and vnstock a naive local string. Normalise both through `data_pipeline.ingestion.common.timeframe` rather than parsing timestamps in a source adapter.
+- Intraday retention is a rolling window of roughly 31 days on SSI and 6 weeks on vnstock `kbs`. An expired request returns an empty success, so `retention_days` must stay set for the guard to fire.
+- Do not assert a fixed bar count per day. A source only emits a bar for an interval that traded, so thin symbols legitimately return fewer bars than liquid ones.
 
 ## Infrastructure wrappers
 
@@ -40,6 +58,7 @@ It is standalone and not yet wired into Dagster assets, jobs, or schedules.
 ## Verification
 
 - Run `uv run pytest` after Python changes.
+- Run `uv run dbt build --project-dir src/data_pipeline/dbt --profiles-dir src/data_pipeline/dbt` after dbt changes, with the warehouse Postgres running.
 - Validate Compose with `make config` and `./make.ps1 config` after deployment configuration changes when the required tools are available.
 - If `make` is unavailable, validate the Makefile changes by inspection and run the equivalent `docker compose -f compose.yml config` and `docker compose -f compose.dev.yml config` commands.
 - If PowerShell is unavailable, validate `make.ps1` by inspection and run the equivalent Docker Compose config commands.

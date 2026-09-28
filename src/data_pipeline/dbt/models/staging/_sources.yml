@@ -6,6 +6,6 @@ sources:
     description: Append-only raw landing tables loaded by Dagster into Postgres.
     tables:
       - name: stock
-        description: One row per vnstock OHLCV record, retaining the source payload as JSONB.
+        description: One row per vnstock intraday OHLCV bar, retaining the source payload as JSONB.
       - name: fund
-        description: One row per SSI iBoard fund/ETF OHLCV record, retaining the source payload as JSONB.
+        description: One row per SSI iBoard intraday fund/ETF OHLCV bar, retaining the source payload as JSONB.

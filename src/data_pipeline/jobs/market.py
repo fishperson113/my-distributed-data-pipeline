@@ -9,5 +9,5 @@ daily_market_ingestion = dg.define_asset_job(
         dg.AssetKey(["bronze", "stock_daily"]),
         dg.AssetKey(["bronze", "fund_daily"]),
     ).downstream(),
-    description="Crawl daily source payloads into Postgres Bronze, then run dbt.",
+    description="Crawl intraday source payloads into Postgres Bronze, then run dbt.",
 )

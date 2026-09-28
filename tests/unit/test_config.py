@@ -42,6 +42,9 @@ ingestion:
     symbols: [fpt, VNM, fpt]
   fund:
     symbol: e1vfvn30
+  intraday:
+    granularity_minutes: 5
+    retention_days: 21
 partitions:
   daily_market:
     start_date: "2025-01-01"
@@ -65,6 +68,10 @@ schedules:
     assert config.daily_schedule.hour == 7
     assert config.daily_schedule.minute == 15
     assert config.daily_schedule.enabled_by_default is True
+    assert config.intraday.granularity_minutes == 5
+    assert config.intraday.retention_days == 21
+    assert config.intraday.vnstock_interval == "5m"
+    assert config.intraday.ssi_resolution == "5"
 
 
 def test_pipeline_config_rejects_invalid_schedule_hour(tmp_path: Path) -> None:
@@ -77,6 +84,9 @@ ingestion:
     symbols: [FPT]
   fund:
     symbol: E1VFVN30
+  intraday:
+    granularity_minutes: 15
+    retention_days: 30
 partitions:
   daily_market:
     start_date: "2025-01-01"
@@ -92,3 +102,55 @@ schedules:
 
     with pytest.raises(ValueError, match="hour must be 0..23"):
         load_pipeline_config(config_path)
+
+
+def _config_text(granularity: str, retention: str = "30") -> str:
+    return f"""
+ingestion:
+  stock:
+    provider: kbs
+    symbols: [FPT]
+  fund:
+    symbol: E1VFVN30
+  intraday:
+    granularity_minutes: {granularity}
+    retention_days: {retention}
+partitions:
+  daily_market:
+    start_date: "2025-01-01"
+    timezone: Asia/Ho_Chi_Minh
+schedules:
+  daily_market_ingestion:
+    hour: 6
+    minute: 0
+    enabled_by_default: false
+""".strip()
+
+
+def test_pipeline_config_rejects_an_unsupported_granularity(tmp_path: Path) -> None:
+    """SSI answers an unrecognised resolution with daily bars and HTTP 200, so a
+    bar width outside the supported set is refused before any request is made."""
+
+    config_path = tmp_path / "bad-granularity.yml"
+    config_path.write_text(_config_text("7"), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="granularity_minutes must be one of"):
+        load_pipeline_config(config_path)
+
+
+def test_pipeline_config_rejects_a_non_positive_retention(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad-retention.yml"
+    config_path.write_text(_config_text("15", "0"), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="retention_days must be a positive integer"):
+        load_pipeline_config(config_path)
+
+
+def test_pipeline_config_accepts_every_supported_granularity(tmp_path: Path) -> None:
+    for minutes in (1, 5, 15, 30, 60):
+        config_path = tmp_path / f"granularity-{minutes}.yml"
+        config_path.write_text(_config_text(str(minutes)), encoding="utf-8")
+
+        config = load_pipeline_config(config_path)
+
+        assert config.intraday.granularity_minutes == minutes

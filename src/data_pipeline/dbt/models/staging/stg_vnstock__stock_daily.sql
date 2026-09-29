@@ -27,6 +27,11 @@ with ranked as (
     from {{ source('bronze', 'stock') }} as stock
     inner join bronze.ingestion_batch as batch on stock.batch_id = batch.batch_id
     where batch.status = 'completed'
+      -- Rows landed before the intraday conversion have no instant in their
+      -- payload and cannot be typed at this grain. Skipping them keeps one
+      -- stale row from failing the not_null tests and blocking the whole
+      -- build; scripts/clear_legacy_bronze.py removes them for good.
+      and stock.payload ? 'ts_epoch'
 )
 
 select

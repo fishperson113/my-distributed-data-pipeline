@@ -244,6 +244,44 @@ def test_stock_intraday_flags_an_expired_partition() -> None:
         )
 
 
+@pytest.mark.parametrize("partition_date", ["2026-09-26", "2020-01-05"])
+def test_stock_intraday_skips_weekends_without_calling_the_source(partition_date: str) -> None:
+    """A Saturday raised inside vnstock and a Sunday leaked Monday's bars."""
+
+    calls: list[dict[str, object]] = []
+
+    extraction = extract_stock_intraday(
+        symbols=["FPT"],
+        partition_date=partition_date,
+        granularity_minutes=15,
+        retention_days=30,
+        market_factory=_market_factory(calls, _stock_frame(["2026-09-28T09:15:00"])),
+    )
+
+    assert calls == []
+    assert extraction.record_count == 0
+
+
+def test_stock_intraday_treats_the_vnstock_empty_error_as_an_empty_day() -> None:
+    class _EmptyEquity:
+        def ohlcv(self, **_: object) -> pd.DataFrame:
+            raise ValueError("Dữ liệu trống cho mã FPT với interval 15m.")
+
+    class _Market:
+        def equity(self, _: str) -> _EmptyEquity:
+            return _EmptyEquity()
+
+    extraction = extract_stock_intraday(
+        symbols=["FPT"],
+        partition_date="2026-09-02",
+        granularity_minutes=15,
+        retention_days=100_000,
+        market_factory=lambda: _Market(),
+    )
+
+    assert extraction.record_count == 0
+
+
 def test_fund_intraday_rejects_mismatched_ohlcv_arrays() -> None:
     """SSI returns OHLCV as parallel arrays; a length mismatch is not recoverable."""
 

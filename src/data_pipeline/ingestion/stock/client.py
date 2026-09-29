@@ -67,6 +67,22 @@ def _bar_budget(*, granularity_minutes: int, span_days: int) -> int:
     return max(MINIMUM_BAR_BUDGET, bars_per_day * max(span_days, 1) * 2)
 
 
+def _fetch_frame(equity: Any, **kwargs: Any) -> Any:
+    """Call vnstock `ohlcv`, treating its empty-range ValueError as no bars.
+
+    vnstock raises ``Dữ liệu trống`` instead of returning an empty frame when a
+    range holds no bars, e.g. a holiday. The retention guard downstream still
+    decides whether an empty day is legitimate.
+    """
+
+    try:
+        return equity.ohlcv(**kwargs)
+    except ValueError as exc:
+        if "Dữ liệu trống" in str(exc):
+            return None
+        raise
+
+
 def extract_stock_intraday(
     *,
     symbols: Iterable[str],
@@ -109,16 +125,21 @@ def extract_stock_intraday(
 
     market = (market_factory or _default_market_factory)()
     records: list[dict[str, Any]] = []
+    # The exchange never trades on weekends. vnstock raises on a Saturday and
+    # leaks Monday's bars into a Sunday, and an old weekend would trip the
+    # retention guard, so weekend partitions skip the source entirely.
+    is_weekend = day.weekday() >= 5
 
-    for symbol in normalized_symbols:
-        frame = market.equity(symbol).ohlcv(
+    for symbol in [] if is_weekend else normalized_symbols:
+        frame = _fetch_frame(
+            market.equity(symbol),
             start=partition_date,
             end=provider_end_exclusive,
             interval=interval,
             count=count,
             source=normalized_provider,
         )
-        source_records = _frame_records(frame)
+        source_records = [] if frame is None else _frame_records(frame)
         if len(source_records) >= count:
             raise SourceResponseError(
                 f"vnstock returned {len(source_records)} bars for {symbol} at the "
@@ -144,7 +165,7 @@ def extract_stock_intraday(
             }
             records.append(bar)
 
-    if not records and retention_days is not None:
+    if not records and not is_weekend and retention_days is not None:
         if is_outside_retention(window_start=window_start, retention_days=retention_days):
             raise IntradayRetentionError(
                 f"vnstock returned no intraday bars for {partition_date}, which is older "

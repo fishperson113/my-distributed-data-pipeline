@@ -40,6 +40,8 @@ url = "https://vnstocks.com/api/simple"
 packages = ["src/data_pipeline"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# The repository root is on the path so tests can import the operational
+# scripts, which are modules rather than an installed package.
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 

@@ -1,0 +1,54 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      # dagster-dbt needs target/manifest.json at import time; it is gitignored,
+      # so build it the same way docker/Dockerfile does. dbt parse does not connect.
+      - run: uv run dbt parse --no-partial-parse --project-dir src/data_pipeline/dbt --profiles-dir src/data_pipeline/dbt
+        env:
+          WAREHOUSE_POSTGRES_PASSWORD: build
+      - run: uv run pytest
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_vps
+          chmod 600 ~/.ssh/id_vps
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          ssh -i ~/.ssh/id_vps "$VPS_USER@$VPS_HOST" "set -eu
+            cd '$VPS_APP_DIR'
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            sh ./scripts/deploy.sh
+            sh ./scripts/smoke-test.sh"

@@ -65,6 +65,21 @@ Confirm that the previous run remains visible in the UI.
 
 Do not delete the `dagster-postgres-data` volume during normal deployment.
 
+## Gold CSV export
+
+Materialize `exports/exp_vn30_vs_fund_daily_csv` in the Dagster UI. The run's
+`download_url` metadata links to the CSV, served read-only from
+`storage/exports/` by the `exports` nginx service on `EXPORT_HTTP_PORT`
+(default `3001`). Set `EXPORT_BASE_URL` in `.env` to the address users reach,
+for example `http://<vps-ip>:3001`. The download port has no authentication.
+
+Create the directory once with the container's UID before the first deploy:
+
+```bash
+sudo mkdir -p storage/exports
+sudo chown 10001:10001 storage/exports
+```
+
 ## Raw landing files
 
 Dagster bind-mounts the repository's `storage/raw/` directory to

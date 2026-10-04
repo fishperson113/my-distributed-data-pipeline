@@ -6,6 +6,7 @@ from dagster_dbt import DbtCliResource
 from data_pipeline.assets.bronze import bronze_fund_daily, bronze_stock_daily
 from data_pipeline.assets.checks import bronze_asset_checks
 from data_pipeline.assets.dbt import DBT_PROJECT_DIR, dbt_market_models
+from data_pipeline.assets.exports import gold_vn30_vs_fund_csv
 from data_pipeline.assets.healthcheck import deployment_healthcheck
 from data_pipeline.jobs.market import daily_market_ingestion
 from data_pipeline.schedules.market import daily_market_ingestion_schedule
@@ -17,6 +18,7 @@ defs = dg.Definitions(
         bronze_stock_daily,
         bronze_fund_daily,
         dbt_market_models,
+        gold_vn30_vs_fund_csv,
     ],
     asset_checks=bronze_asset_checks,
     jobs=[daily_market_ingestion],

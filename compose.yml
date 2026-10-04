@@ -14,6 +14,7 @@ x-dagster-environment: &dagster-environment
   SOURCE_HTTP_MAX_ATTEMPTS: ${SOURCE_HTTP_MAX_ATTEMPTS:-3}
   RAW_STORAGE_PATH: ${RAW_STORAGE_PATH:-/opt/dagster/app/storage/raw}
   PIPELINE_CONFIG_PATH: ${PIPELINE_CONFIG_PATH:-/opt/dagster/app/config.yml}
+  EXPORT_BASE_URL: ${EXPORT_BASE_URL:-http://localhost:3001}
   WAREHOUSE_POSTGRES_DSN: postgresql://${WAREHOUSE_POSTGRES_USER:-warehouse}:${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}@warehouse-postgres:5432/${WAREHOUSE_POSTGRES_DB:-warehouse}
   WAREHOUSE_POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-warehouse}
   WAREHOUSE_POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:?WAREHOUSE_POSTGRES_PASSWORD must be set in .env}
@@ -116,6 +117,7 @@ services:
       - ./docker/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
       - dagster-compute-logs:/opt/dagster/compute_logs
       - ./storage/raw:/opt/dagster/app/storage/raw
+      - ./storage/exports:/opt/dagster/app/storage/exports
 
   dagster-webserver:
     <<: *dagster-service
@@ -138,6 +140,7 @@ services:
       - ./docker/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
       - dagster-compute-logs:/opt/dagster/compute_logs
       - ./storage/raw:/opt/dagster/app/storage/raw
+      - ./storage/exports:/opt/dagster/app/storage/exports
 
   dagster-daemon:
     <<: *dagster-service
@@ -155,6 +158,17 @@ services:
       - ./docker/dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
       - dagster-compute-logs:/opt/dagster/compute_logs
       - ./storage/raw:/opt/dagster/app/storage/raw
+      - ./storage/exports:/opt/dagster/app/storage/exports
+
+  # Serves storage/exports read-only so CSV exports can be downloaded from the
+  # link in the asset's Dagster metadata. No auth: same exposure as the UI port.
+  exports:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${EXPORT_HTTP_PORT:-3001}:80"
+    volumes:
+      - ./storage/exports:/usr/share/nginx/html:ro
 
 volumes:
   dagster-postgres-data:

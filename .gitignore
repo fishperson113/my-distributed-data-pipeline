@@ -25,6 +25,7 @@ src/data_pipeline/dbt/dbt_packages/
 # Runtime data
 storage/raw/**
 storage/backups/**
+storage/exports/**
 !storage/raw/.gitkeep
 !storage/backups/.gitkeep
 
